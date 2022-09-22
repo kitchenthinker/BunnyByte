@@ -1,4 +1,5 @@
-discord.py
 pymysql
 asyncio
-requests
+requests~=2.27.1
+discord~=2.0.0
+python-dotenv~=0.20.0
