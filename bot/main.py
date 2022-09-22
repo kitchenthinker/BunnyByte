@@ -210,7 +210,7 @@ def main_func():
 
     @bot.event
     async def on_ready():
-        pass
+        print(f"Logged in as {bot.user.name}({bot.user.id})")
         # is_ready = bot_settings.get('is_ready')
         # if is_ready is not None and is_ready:
         #     channel_id = bot_settings['channel_id']
