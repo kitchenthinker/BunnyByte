@@ -1,6 +1,55 @@
 import requests
 import json
 import datetime
+import discord
+from discord import ButtonStyle
+from discord.ui import Button, View
+from typing import List
+from dateutil import parser
+
+class EGSGame:
+
+    def __init__(self, **game_info):
+        self.id = game_info.get('id')
+        self.title = game_info.get('title')
+        self.description = game_info.get('description')
+        self.url = game_info.get('url')
+        self.exp_date = game_info.get('exp_date')
+        self.thumbnail = game_info.get('thumbnail')
+
+    def get_game_info(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "url": self.url,
+            "exp_date": self.exp_date,
+            "thumbnail": self.thumbnail,
+        }
+
+    def get_discord_game_card(self):
+        game_card_info = self.get_game_info()
+        embed_card = discord.Embed(title=self.title,
+                                   url=self.url,
+                                   description=self.description,
+                                   # timestamp=video_info['publish_date'],
+                                   colour=discord.Colour.purple())
+
+        embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!")
+        embed_card.set_image(url=self.thumbnail)
+        thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
+        embed_card.set_thumbnail(url="attachment://epic_logo.png")
+        game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕",
+                             style=ButtonStyle.red,
+                             url=self.url,
+                             )
+        dc_view = View()
+        dc_view.add_item(game_button)
+        # video_card = {
+        #     'embed_': embed_card,
+        #     'component_': video_button,
+        # }
+        return game_card_info, embed_card, dc_view, thumbnail_file
 
 
 class EGSGamesParser:
@@ -14,10 +63,10 @@ class EGSGamesParser:
 
         }
         self.fp_url = 'https://store.epicgames.com/p/'
-        self.free_games = dict()
+        self.free_games: List[EGSGame] = []
         self.refresh()
 
-    def get_json(self):
+    def get_games_data_from_api(self):
         r = requests.get(url=self.API, params=self.param)
         if r.status_code != 200:
             return None
@@ -27,8 +76,7 @@ class EGSGamesParser:
         self.get_free_games()
 
     def get_free_games(self):
-        data = self.get_json()
-        json_data = dict()
+        data = self.get_games_data_from_api()
         if data is not None:
             free_games_list = [x for x in data['data']['Catalog']['searchStore']['elements'] if
                                x['promotions'] is not None]
@@ -39,14 +87,16 @@ class EGSGamesParser:
                     description = fg['description'],
                     url = fg['catalogNs']['mappings'][0]['pageSlug']
                     img = [x['url'] for x in fg['keyImages'] if x['type'] == 'OfferImageWide'][0]
-                    str_date = fg['promotions']['promotionalOffers'][0]['promotionalOffers'][0]['endDate'][:10]
-                    exp_date = str(datetime.datetime.strptime(str_date, "%Y-%m-%d"))[:10]
+                    str_date = fg['promotions']['promotionalOffers'][0]['promotionalOffers'][0]['endDate']
+                    #r_date = parser.isoparse(str_date)
+                    exp_date = datetime.datetime.strptime(str_date, "%Y-%m-%dT%H:%M:%S.%fZ")
                     fg_item = {
-                        'title': title,
-                        'description': description[0],
-                        'url': f'{self.fp_url}{url}',
-                        'expdate': exp_date,
-                        'img': img,
+                        "id": fg['id'],
+                        "title": title,
+                        "description": description[0],
+                        "url": f'{self.fp_url}{url}',
+                        "exp_date": exp_date,
+                        "thumbnail": img,
                     }
-                    json_data[fg['id']] = fg_item
-        self.free_games = json_data
+                    egs_game = EGSGame(**fg_item)
+                    self.free_games.append(egs_game)
