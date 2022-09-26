@@ -16,7 +16,7 @@ from discord.ext import (
 )
 # endregion
 # region MY_FILES
-from yt_parser import YTParser
+from yt_parser import YTParser, BUNNY_CHANNEL_ID
 from egs_parser import EGSGamesParser, EGSGame
 
 # endregion
@@ -42,7 +42,7 @@ def is_user_admin(ctx: commands.Context | Interaction):
     return ctx.author.guild_permissions.administrator
 
 
-def yt_video_save_to_dbase(server: commands.Context, yt_video=None):
+def yt_video_save_to_dbase(yt_video=None):
     if yt_video is None:
         print("There's no a video object")
         return
@@ -50,9 +50,9 @@ def yt_video_save_to_dbase(server: commands.Context, yt_video=None):
     try:
         MYSQL = mysql.MYSQL()
         MYSQL.get_data(f"SELECT * FROM yt_videos")
-        db_videos = MYSQL.data
-        if yt_video in db_videos:
-            print("The video is already on db.")
+        db_videos = [x['video_id'] for x in MYSQL.data]
+        if yt_video.video_id in db_videos:
+            print(f"The video {yt_video.title} is already on db.")
             return
         MYSQL.execute(
             user_query="INSERT INTO yt_videos "
@@ -76,9 +76,10 @@ def egs_games_save_to_dbase(server: commands.Context, games_list: List[EGSGame])
     try:
         MYSQL = mysql.MYSQL()
         MYSQL.get_data(f"SELECT * FROM egs_games")
-        db_games = MYSQL.data
+        db_games = [x['game_id'] for x in MYSQL.data]
         for g in games_list:
-            if g in db_games:
+            if g.id in db_games:
+                print(f"The video {g.title} is already on db.")
                 continue
             MYSQL.execute(
                 user_query="INSERT INTO egs_games "
@@ -103,6 +104,46 @@ def server_get_status(server_id: int | str = None):
     except Exception as e:
         print(e)
 
+
+def server_get_bot_channel(server_id: int | str = None):
+    try:
+        MYSQL = mysql.MYSQL()
+        MYSQL.get_data(f"SELECT * FROM `bot_config` WHERE `server_id`=%s",
+                       values=server_id
+                       )
+        MYSQL.close()
+        if MYSQL.empty:
+            return None
+        else:
+            return int(MYSQL.data[0]['service_channel'])
+    except Exception as e:
+        print(e)
+
+
+# region LOCAL_BOT
+def local_flush_server_settings(server_id: int | str = None):
+    BOT_LOCAL_CONFIG[server_id]['bot_channel'] = None
+    BOT_LOCAL_CONFIG[server_id]['tasks'] = list()
+    BOT_LOCAL_CONFIG[server_id]['status'] = ServerStatus.UNREGISTERED
+    BOT_LOCAL_CONFIG[server_id]['tasks'] = {
+        'ytb': None,
+        'egs': None,
+    }
+
+
+def local_get_bot_channel(server_id: int | str = None):
+    return BOT_LOCAL_CONFIG[server_id].get('bot_channel')
+
+
+def local_get_tasks(server_id: int | str = None):
+    return BOT_LOCAL_CONFIG[server_id].get('tasks')
+
+
+def local_get_status(server_id: int | str = None):
+    return BOT_LOCAL_CONFIG[server_id].get('status')
+
+
+# endregion
 
 def discord_bot():
     intents = discord.Intents.default()
@@ -137,46 +178,6 @@ def discord_bot():
     #     await interaction.response.send_message(f'{member} joined at {discord.utils.format_dt(member.joined_at)}')
 
     # region SLASH_COMMANDS
-    @bot.tree.command(name="server_info")
-    @commands.has_permissions(administrator=True)
-    async def server_info(ctx: Interaction):
-        # if is_user_admin(ctx):
-        server = ctx.guild
-        try:
-            emb = discord.Embed(
-                title="SERVER-INFO",
-                description=f"Name: [**{ctx.guild.name}**]\n"
-                            f"ID: [**{ctx.guild.id}**]\n"
-                            f"Status: [**{BOT_LOCAL_CONFIG[str(server.id)]['status'].name}**]"
-            )
-            await ctx.response.send_message(embed=emb)
-            await delete_discord_message(ctx, 10)
-        except Exception as e:
-            await ctx.response.send_message(
-                f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
-
-    @bot.tree.command(name="server_delete")
-    @commands.has_permissions(administrator=True)
-    async def server_delete(ctx: Interaction):
-        # if is_user_admin(ctx):
-        server = ctx.guild
-        MYSQL = mysql.MYSQL()
-        try:
-            MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
-            if MYSQL.empty:
-                await ctx.response.send_message(
-                    f"Your Server [**{server.name}**]:[**{server.id}**] hasn't been registered. Aborted.")
-                await delete_discord_message(ctx)
-                return
-            MYSQL.execute(f"DELETE FROM servers WHERE `id`='{server.id}'")
-            MYSQL.commit(True)
-            BOT_LOCAL_CONFIG[str(server.id)]['status'] = ServerStatus.UNREGISTERED
-            await ctx.response.send_message(
-                f"Your Server [**{server.name}**]:[**{server.id}**] has been deleted.")
-            await delete_discord_message(ctx, 10)
-        except Exception as e:
-            await ctx.response.send_message(
-                f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
     @bot.tree.command(name="help")
     @commands.has_permissions(administrator=True)
@@ -215,22 +216,68 @@ def discord_bot():
         await ctx.response.send_message(embed=emb)
         await delete_discord_message(ctx, 30)
 
-    @bot.command()
-    async def l_start(ctx: commands.Context):
-        server = ctx.guild
-        task_to_run: tasks.Loop | None = SERVER_TASKS.get(server.id)
-
+    # LOOPS
+    @bot.tree.command(name="bb_ytube",
+                      description="Enable YouTube Notificator.")
+    @app_commands.describe(yt_channel_url="YouTube channel ID", yt_minutes_delay="Check new video every X minutes.")
+    @commands.has_permissions(administrator=True)
+    async def ytube_service_start(ctx: Interaction, yt_channel_url: str, yt_minutes_delay: int = 2):
         try:
+            await ctx.response.defer(ephemeral=False)
+            server = ctx.guild
+            if local_get_status(server.id) == ServerStatus.UNREGISTERED:
+                print(f'Server **{server.name}** Unregistered')
+                await ctx.edit_original_response(content=f'Server **{server.name}** Unregistered')
+                await delete_discord_message(ctx, 5)
+                return
+
+            task_to_run: tasks.Loop | None = BOT_LOCAL_CONFIG[server.id]['tasks'].get('ytb')
+
             if task_to_run is None:
-                new_task = SERVER_TASKS[server.id] = tasks.loop(minutes=1)(first_loop)
+                new_task = BOT_LOCAL_CONFIG[server.id]['tasks']['ytb'] = tasks.loop(minutes=yt_minutes_delay)(
+                    yt_last_video)
                 task_to_run = new_task
             if task_to_run.is_running():
+                await ctx.edit_original_response(content=f"Loop task is already running on {server.name}")
+                await delete_discord_message(ctx, 5)
                 print(f"Loop task is already running on {server.name}")
             else:
-                task_to_run.start(ctx)
+                await ctx.edit_original_response(content=f"The loop is alive on {server.name}")
+                await delete_discord_message(ctx, 5)
+                task_to_run.start(ctx, yt_channel_url)
                 print(f"The loop is alive on {server.name}")
-        except TypeError as e:
-            print(f"Opps! {e}")
+        except Exception as e:
+            await ctx.edit_original_response(
+                content=f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
+
+    @bot.tree.command(name="bb_ytube_stop",
+                      description="Disable YouTube Notificator.")
+    # @app_commands.describe(yt_channel_url="YouTube channel ID", yt_minutes_delay="Check new video every X minutes.")
+    @commands.has_permissions(administrator=True)
+    async def ytube_service_start(ctx: Interaction):
+        try:
+            await ctx.response.defer(ephemeral=False)
+            server = ctx.guild
+            if local_get_status(server.id) == ServerStatus.UNREGISTERED:
+                print(f'Server **{server.name}** Unregistered')
+                await ctx.edit_original_response(content=f'Server **{server.name}** Unregistered')
+                await delete_discord_message(ctx, 5)
+                return
+
+            task_to_run: tasks.Loop | None = BOT_LOCAL_CONFIG[server.id]['tasks'].get('ytb')
+
+            if task_to_run is None:
+                print(f"Nothing to stop on {server.name}")
+                await ctx.edit_original_response(content=f"Nothing to stop on {server.name}")
+                await delete_discord_message(ctx, 5)
+                return
+            task_to_run.cancel()
+            print(f"The loop is shut down on {server.name}")
+            await ctx.edit_original_response(content=f"The loop is shut down on {server.name}")
+            await delete_discord_message(ctx, 5)
+        except Exception as e:
+            await ctx.edit_original_response(
+                content=f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
     @bot.command()
     async def l_stop(ctx: commands.Context):
@@ -245,15 +292,21 @@ def discord_bot():
     async def first_loop(ctx: commands.Context):
         await ctx.send(f'Hi, looser! **{ctx.author.name}** from **{ctx.guild.name}** server')
 
-    @bot.command(name='yt_last_video', aliases=['yt-lvideo'])
-    async def yt_last_video(ctx):
-        yt_channel = YTParser()
-        yt_channel.get_last_video()
-        video_info, emb, view_ = yt_channel.get_discord_video_card(yt_channel.current_video, True)
-        print(f"Fetching video info: {video_info['title']}")
-        await ctx.send(embed=emb, view=view_)
-        yt_video_save_to_dbase(ctx, yt_channel.current_video)
-        print(f"Got video info: {video_info['title']}")
+    async def yt_last_video(ctx: discord.Interaction,
+                            yt_channel_url: str = BUNNY_CHANNEL_ID,
+                            enable_description: int = 0):
+        try:
+            yt_channel = YTParser(yt_channel_url)
+            yt_channel.get_last_video()
+            video_info, emb, view_ = yt_channel.get_discord_video_card(yt_channel.current_video,
+                                                                       bool(enable_description))
+            print(f"Fetching video info: {video_info['title']}")
+            bot_channel = bot.get_channel(ctx.channel_id)
+            await bot_channel.send(embed=emb, view=view_)
+            yt_video_save_to_dbase(yt_channel.current_video)
+            print(f"Got video info: {video_info['title']}")
+        except Exception as e:
+            print(e)
 
     @bot.command(name='get_games', aliases=['epic'])
     async def get_games(ctx: commands.Context):
@@ -266,84 +319,151 @@ def discord_bot():
         egs_games_save_to_dbase(ctx, egs.free_games)
 
     # region SC_SERVER
-    @bot.command(name="server_info", aliases=['server-info'])
+    @bot.tree.command(name="bb_server_info",
+                      description="Show SERVER info.")
     @commands.has_permissions(administrator=True)
-    async def server_info(ctx: commands.Context):
+    async def server_info(ctx: Interaction):
         # if is_user_admin(ctx):
         server = ctx.guild
         try:
-            MYSQL = mysql.MYSQL()
-            MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
-            registration = "UN-REGISTERED" if MYSQL.empty else "REGISTERED"
-            msg = f"Server info:\n" \
-                  f"Name: [**{ctx.guild.name}**]\n" \
-                  f"ID: [**{ctx.guild.id}**]\n" \
-                  f"Status: [**{registration}**]"
-            MYSQL.close()
-            await ctx.send(msg, delete_after=10)
+            bot_channel = local_get_bot_channel(server.id)
+            if bot_channel is not None:
+                bot_channel = bot.get_channel(bot_channel).name
+            emb = discord.Embed(
+                title="SERVER-INFO",
+                description=f"Name: [**{ctx.guild.name}**]\n"
+                            f"ID: [**{ctx.guild.id}**]\n"
+                            f"Status: [**{BOT_LOCAL_CONFIG[server.id]['status'].name}**]\n"
+                            f"Service channel: [**{bot_channel}**]\n"
+            )
+            await ctx.response.send_message(embed=emb)
+            await delete_discord_message(ctx, 10)
         except Exception as e:
-            await ctx.send(f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
+            await ctx.response.send_message(
+                f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
-    @bot.command(name="server_signup", aliases=['server-register'])
+    @bot.tree.command(name="bb_server_change_channel",
+                      description="Change service (private) channel for notifications from bot.")
+    @app_commands.describe(bot_channel='Service (Private) Channel for sending messages from bot.')
     @commands.has_permissions(administrator=True)
-    async def server_signup(ctx: commands.Context, bot_channel: discord.TextChannel | None):
+    async def server_change_channel(ctx: discord.Interaction, bot_channel: discord.TextChannel):
+        server = ctx.guild
+        await ctx.response.defer(ephemeral=False)
+        if bot_channel is None:
+            await ctx.edit_original_response(content="Bunny, I need a channel. Stay focused!")
+            await delete_discord_message(ctx, 10)
+            return
+
+        try:
+            server_status = local_get_status(server.id)
+            if server_status == ServerStatus.UNREGISTERED:
+                await ctx.edit_original_response(
+                    content="Hey, Bunny! You need to be registered before changing something :)")
+                await delete_discord_message(ctx, 5)
+                return
+            if bot_channel.id == local_get_bot_channel(server.id):
+                await ctx.edit_original_response(
+                    content="Hey, Bunny! You are giving me the same channel. Are you alright? :)")
+                await delete_discord_message(ctx, 5)
+                return
+            MYSQL = mysql.MYSQL()
+            MYSQL.execute("UPDATE bot_config SET `service_channel` = %s WHERE `server_id` = %s",
+                          values=(bot_channel.id, server.id))
+            MYSQL.commit()
+            BOT_LOCAL_CONFIG[server.id]['bot_channel'] = bot_channel.id
+            await ctx.edit_original_response(
+                content=f"It's done. **{bot_channel.name}** now is your new service channel.")
+            await delete_discord_message(ctx, 10)
+        except Exception as e:
+            await ctx.edit_original_response(
+                content=f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
+
+    @bot.tree.command(name="bb_server_signup",
+                      description="Register the bot. You need to create a private channel (mute) & give me permission.")
+    @app_commands.describe(bot_channel='Service (Private) Channel for sending messages from bot.')
+    @commands.has_permissions(administrator=True)
+    async def server_signup(ctx: discord.Interaction, bot_channel: discord.TextChannel):
         # if is_user_admin(ctx):
         server = ctx.guild
-        MYSQL = mysql.MYSQL()
+        await ctx.response.defer(ephemeral=False)
         if bot_channel is None:
-            await ctx.send(
-                content="Use this command! .server-registered #your-service-channel-for-bot.",
-                delete_after=3,
-                ephemeral=True)
+            await ctx.edit_original_response(content="Bunny, I need a channel. Stay focused!")
+            await delete_discord_message(ctx, 10)
             return
+        MYSQL = mysql.MYSQL()
         try:
-            MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
-            if not MYSQL.empty:
-                await ctx.send(f"You're already here [**{server.name}**]:[**{server.id}**]", delete_after=5)
+            # MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
+            # if not MYSQL.empty:
+            if BOT_LOCAL_CONFIG[server.id]['status'] == ServerStatus.REGISTERED:
+                await ctx.edit_original_response(content=f"You're already here [**{server.name}**]:[**{server.id}**]")
+                await delete_discord_message(ctx, 10)
                 return
             # Making a registration
             print(f"Creating server row for [**{server.name}**]:[**{server.id}**]...")
-            MYSQL.execute(f"INSERT INTO servers (`id`, `name`) VALUES ('{server.id}', '{server.name}');")
+            MYSQL.execute(
+                user_query=f"INSERT INTO servers (`id`, `name`) VALUES (%s, %s)",
+                values=(server.id, server.name)
+            )
             await asyncio.sleep(2)
             print(f"Creating settings for [**{server.name}**]:[**{server.id}**]...")
             MYSQL.get_data(f"SELECT * FROM `settings`")
             features = MYSQL.data
             # user_query = f"INSERT INTO servers (`id`, `name`) VALUES ('{server.id}', '{server.name}');"
-            user_query = f"INSERT INTO srv_config (`server_id`, `setting_id`, `value`) VALUES "
+            user_query = f"INSERT INTO srv_config (`server_id`, `setting_id`, `value`) VALUES (%s, %s, %s) "
+            value_list = []
             for feature in features:
-                user_query += f"('{server.id}', '{feature['id']}', '')"
-                user_query += ';' if feature == features[-1] else ','
-            MYSQL.execute(user_query)
+                value = None
+                if feature['type'] == 'bool':
+                    value = False
+                value_list.append((server.id, feature['id'], value))
+                # user_query += f"('{server.id}', '{feature['id']}', {value})"
+                # user_query += ';' if feature == features[-1] else ','
+            MYSQL.executemany(user_query, value_list)
+            MYSQL.execute('INSERT INTO bot_config (service_channel, server_id) VALUES (%s, %s)',
+                          values=(bot_channel.id, server.id))
             await asyncio.sleep(2)
             MYSQL.commit(True)
-            await ctx.send(f"Your Server [**{server.name}**]:[**{server.id}**] has been registered. Congrats!.",
-                           delete_after=5)
-        except Exception as e:
-            await ctx.send(f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
-    @bot.command(name="server_delete", aliases=['server-delete'])
+            BOT_LOCAL_CONFIG[server.id]['status'] = ServerStatus.REGISTERED
+            BOT_LOCAL_CONFIG[server.id]['bot_channel'] = bot_channel.id
+
+            await ctx.edit_original_response(
+                content=f"Your Server [**{server.name}**]:[**{server.id}**] has been registered. Congrats!.")
+            await delete_discord_message(ctx, 10)
+        except Exception as e:
+            await ctx.edit_original_response(
+                content=f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
+
+    @bot.tree.command(name="bb_server_delete",
+                      description="Delete server from bot' database. **All your setting will be lost.**")
     @commands.has_permissions(administrator=True)
-    async def server_delete(ctx: commands.Context):
+    async def server_delete(ctx: Interaction):
         # if is_user_admin(ctx):
         server = ctx.guild
+        await ctx.response.defer(ephemeral=False)
         MYSQL = mysql.MYSQL()
         try:
-            MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
-            if MYSQL.empty:
-                await ctx.send(
-                    f"Your Server [**{server.name}**]:[**{server.id}**] hasn't been registered. Aborted.")
+            SRV_STATUS = BOT_LOCAL_CONFIG[server.id]['status']
+            # MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
+            # if MYSQL.empty:
+            if SRV_STATUS == ServerStatus.UNREGISTERED:
+                await ctx.edit_original_response(
+                    content=f"Your Server [**{server.name}**]:[**{server.id}**] hasn't been registered. Aborted.")
+                await delete_discord_message(ctx)
                 return
             MYSQL.execute(f"DELETE FROM servers WHERE `id`='{server.id}'")
             MYSQL.commit(True)
-            BOT_LOCAL_CONFIG[str(server.id)]['status'] = ServerStatus.UNREGISTERED
-            await ctx.send(f"Your Server [**{server.name}**]:[**{server.id}**] has been deleted.", delete_after=10)
-
+            local_flush_server_settings(server.id)
+            await ctx.edit_original_response(
+                content=f"Your Server [**{server.name}**]:[**{server.id}**] has been deleted.")
+            await delete_discord_message(ctx, 10)
         except Exception as e:
-            await ctx.send(f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
+            await ctx.response.edit_original_response(
+                content=f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
     # endregion
 
-    @bot.command(name="custom_help", aliases=["help"])
+    @bot.command(name="bb_help", aliases=["help"])
     @commands.has_permissions(administrator=True)
     async def custom_help(ctx: commands.Context):
         # if not is_user_admin(ctx):
@@ -378,21 +498,33 @@ def discord_bot():
         emb.set_thumbnail(url=ctx.bot.user.avatar)
         await ctx.send(embed=emb, delete_after=60)
 
+    async def bot_say_hi_to_registered_server(server_id: int | str):
+        if bot.is_ready() and local_get_status(server_id) == ServerStatus.REGISTERED:
+            try:
+                bot_channel = bot.get_channel(BOT_LOCAL_CONFIG[server_id]['bot_channel'])
+                await bot_channel.send(content=f"Hi! **{BOT_LOCAL_CONFIG[server_id]['name']}** SERVER. I'm online!!!")
+            except discord.errors.Forbidden as e:
+                print(f"I have a service channel on {server_id}, but I have no rights. Just skipping this carrotbutt.")
+
     # endregion
     @bot.event
     async def on_ready():
         await bot.wait_until_ready()
         await bot.tree.sync()
-
         print(f"Logged in as {bot.user.name}({bot.user.id})")
         for server in bot.guilds:
-            server_id = str(server.id)
-            BOT_LOCAL_CONFIG[server_id] = {
-                'id': server_id,
+            await bot.tree.sync(guild=server)
+            BOT_LOCAL_CONFIG[server.id] = {
+                'id': server.id,
                 'name': server.name,
+                'bot_channel': server_get_bot_channel(server.id),
                 'status': server_get_status(server.id),
-                'tasks': [],
+                'tasks': {
+                    'ytb': None,
+                    'egs': None,
+                },
             }
+            await bot_say_hi_to_registered_server(server.id)
             print(f"Server:[{server.name}]:[{server.id}]")
 
     bot.run(token=config.BUNNYBYTE_TOKEN)

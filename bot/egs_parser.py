@@ -5,7 +5,6 @@ import discord
 from discord import ButtonStyle
 from discord.ui import Button, View
 from typing import List
-from dateutil import parser
 
 class EGSGame:
 
@@ -39,6 +38,7 @@ class EGSGame:
         embed_card.set_image(url=self.thumbnail)
         thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
         embed_card.set_thumbnail(url="attachment://epic_logo.png")
+        embed_card.add_field(name="Спеши до:", value=datetime.datetime.strftime(self.exp_date, "%d.%m.%y %H:%M"))
         game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕",
                              style=ButtonStyle.red,
                              url=self.url,
