@@ -26,13 +26,82 @@ SERVER_TASKS = dict()
 BOT_LOCAL_CONFIG = dict()
 
 
-# bot_settings = dict()
-# games_from_file = []
-# egs_obj = EGSGamesParser()
+# region HELPERS CLASSES
+class SettingSwitcher(Enum):
+    Enable = 1
+    Disable = 0
 
 
+class ServerStatus(Flag):
+    REGISTERED = True
+    UNREGISTERED = False
+
+
+# endregion
 def is_user_admin(ctx: commands.Context | Interaction):
     return ctx.author.guild_permissions.administrator
+
+
+def yt_video_save_to_dbase(server: commands.Context, yt_video=None):
+    if yt_video is None:
+        print("There's no a video object")
+        return
+
+    try:
+        MYSQL = mysql.MYSQL()
+        MYSQL.get_data(f"SELECT * FROM yt_videos")
+        db_videos = MYSQL.data
+        if yt_video in db_videos:
+            print("The video is already on db.")
+            return
+        MYSQL.execute(
+            user_query="INSERT INTO yt_videos "
+                       "(`video_id`, `title`, `author`, `publish_date`, `thumbnail_url`, `watch_url`) "
+                       "VALUES (%s, %s, %s, %s, %s, %s)",
+            values=(yt_video.video_id, yt_video.title, yt_video.author,
+                    yt_video.publish_date, yt_video.thumbnail_url, yt_video.watch_url)
+        )
+        # inserted_video_id = MYSQL.cursor.lastrowid
+        MYSQL.commit(True)
+        print(f"YT-video has been saved.")
+    except Exception as e:
+        print(f"Error: [{e}]")
+
+
+def egs_games_save_to_dbase(server: commands.Context, games_list: List[EGSGame]):
+    if not games_list:
+        print("Games list is empty.")
+        return
+
+    try:
+        MYSQL = mysql.MYSQL()
+        MYSQL.get_data(f"SELECT * FROM egs_games")
+        db_games = MYSQL.data
+        for g in games_list:
+            if g in db_games:
+                continue
+            MYSQL.execute(
+                user_query="INSERT INTO egs_games "
+                           "(`game_id`, `title`, `description`, `url`, `expdate`, `cover_url`) "
+                           "VALUES (%s, %s, %s, %s, %s, %s)",
+                values=(g.id, g.title, g.description, g.url, g.exp_date, g.thumbnail)
+            )
+        MYSQL.commit(True)
+        print(f"Games list has been saved.")
+    except Exception as e:
+        print(f"Error: [{e}]")
+
+
+def server_get_status(server_id: int | str = None):
+    try:
+        MYSQL = mysql.MYSQL()
+        MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`=%s",
+                       values=server_id
+                       )
+        MYSQL.close()
+        return ServerStatus(not MYSQL.empty)
+    except Exception as e:
+        print(e)
 
 
 def discord_bot():
@@ -41,17 +110,14 @@ def discord_bot():
     bot = commands.Bot(command_prefix='.', intents=intents)
     bot.remove_command('help')
 
+    async def delete_discord_message(msg: discord.Message | discord.Interaction, delete_after_sec: int = 3):
+        await asyncio.sleep(delete_after_sec)
+        if isinstance(msg, discord.Message):
+            await msg.delete()
+        elif isinstance(msg, discord.Interaction):
+            await msg.delete_original_response()
+
     # region Interactions
-
-    @bot.tree.command()
-    async def hello(interaction: discord.Interaction):
-        """Says hello!"""
-        await interaction.response.send_message(f'Hi, {interaction.user.mention}')
-
-    class SettingSwitcher(Enum):
-        Enable = 1
-        Disable = 0
-
     @bot.tree.command(name="test1")
     @app_commands.describe(c_status='Enable/Disable Command')
     async def joined(interaction: discord.Interaction, c_status: SettingSwitcher, b: bool = None):
@@ -65,43 +131,12 @@ def discord_bot():
     # It always takes an interaction as its first parameter and a Member or Message as its second parameter.
 
     # This context menu command only works on members
-    @bot.tree.context_menu(name='Show Join Date')
-    async def show_join_date(interaction: discord.Interaction, member: discord.Member):
-        # The format_dt function formats the date time into a human readable representation in the official client
-        await interaction.response.send_message(f'{member} joined at {discord.utils.format_dt(member.joined_at)}')
-
-    # This context menu command only works on messages
-    @bot.tree.context_menu(name='Report to Moderators')
-    async def report_message(interaction: discord.Interaction, message: discord.Message):
-        # We're sending this response message with ephemeral=True, so only the command executor can see it
-        await interaction.response.send_message(
-            f'Thanks for reporting this message by {message.author.mention} to our moderators.', ephemeral=True
-        )
-
-        # Handle report by sending it into a log channel
-        log_channel = interaction.guild.get_channel(0)  # replace with your channel id
-
-        embed = discord.Embed(title='Reported Message')
-        if message.content:
-            embed.description = message.content
-
-        embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
-        embed.timestamp = message.created_at
-
-        url_view = discord.ui.View()
-        url_view.add_item(discord.ui.Button(label='Go to Message', style=discord.ButtonStyle.url, url=message.jump_url))
-
-        await log_channel.send(embed=embed, view=url_view)
+    # @bot.tree.context_menu(name='Show Join Date')
+    # async def show_join_date(interaction: discord.Interaction, member: discord.Member):
+    #     # The format_dt function formats the date time into a human readable representation in the official client
+    #     await interaction.response.send_message(f'{member} joined at {discord.utils.format_dt(member.joined_at)}')
 
     # region SLASH_COMMANDS
-    async def delete_discord_message(msg: discord.Message | discord.Interaction, delete_after_sec: int = 3):
-        await asyncio.sleep(delete_after_sec)
-        if isinstance(msg, discord.Message):
-            await msg.delete()
-        elif isinstance(msg, discord.Interaction):
-            await msg.delete_original_response()
-
-    # region SC_SERVER
     @bot.tree.command(name="server_info")
     @commands.has_permissions(administrator=True)
     async def server_info(ctx: Interaction):
@@ -143,7 +178,6 @@ def discord_bot():
             await ctx.response.send_message(
                 f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
-    # endregion
     @bot.tree.command(name="help")
     @commands.has_permissions(administrator=True)
     async def custom_help(ctx: discord.Interaction):
@@ -181,22 +215,6 @@ def discord_bot():
         await ctx.response.send_message(embed=emb)
         await delete_discord_message(ctx, 30)
 
-    # endregion
-
-    # endregion
-    # @bot.command()
-    # async def show_sets(ctx):
-    #     if ctx.author.bot or ctx.author.guild_permissions.administrator:
-    #         msg = ""
-    #         msg += "||"
-    #         for key, setting in bot_settings.items():
-    #             msg += f"**{key}**:{setting}\n"
-    #         msg += "||"
-    #         d_msg = await ctx.send(msg)
-    #         await asyncio.sleep(10)
-    #         await d_msg.delete()
-    #
-
     @bot.command()
     async def l_start(ctx: commands.Context):
         server = ctx.guild
@@ -227,31 +245,6 @@ def discord_bot():
     async def first_loop(ctx: commands.Context):
         await ctx.send(f'Hi, looser! **{ctx.author.name}** from **{ctx.guild.name}** server')
 
-    def yt_video_save_to_dbase(server: commands.Context, yt_video=None):
-        if yt_video is None:
-            print("There's no a video object")
-            return
-
-        try:
-            MYSQL = mysql.MYSQL()
-            MYSQL.get_data(f"SELECT * FROM yt_videos")
-            db_videos = MYSQL.data
-            if yt_video in db_videos:
-                print("The video is already on db.")
-                return
-            MYSQL.execute(
-                user_query="INSERT INTO yt_videos "
-                           "(`video_id`, `title`, `author`, `publish_date`, `thumbnail_url`, `watch_url`) "
-                           "VALUES (%s, %s, %s, %s, %s, %s)",
-                values=(yt_video.video_id, yt_video.title, yt_video.author,
-                        yt_video.publish_date, yt_video.thumbnail_url, yt_video.watch_url)
-            )
-            # inserted_video_id = MYSQL.cursor.lastrowid
-            MYSQL.commit(True)
-            print(f"YT-video has been saved.")
-        except Exception as e:
-            print(f"Error: [{e}]")
-
     @bot.command(name='yt_last_video', aliases=['yt-lvideo'])
     async def yt_last_video(ctx):
         yt_channel = YTParser()
@@ -261,29 +254,6 @@ def discord_bot():
         await ctx.send(embed=emb, view=view_)
         yt_video_save_to_dbase(ctx, yt_channel.current_video)
         print(f"Got video info: {video_info['title']}")
-
-    def egs_games_save_to_dbase(server: commands.Context, games_list: List[EGSGame]):
-        if not games_list:
-            print("Games list is empty.")
-            return
-
-        try:
-            MYSQL = mysql.MYSQL()
-            MYSQL.get_data(f"SELECT * FROM egs_games")
-            db_games = MYSQL.data
-            for g in games_list:
-                if g in db_games:
-                    continue
-                MYSQL.execute(
-                    user_query="INSERT INTO egs_games "
-                               "(`game_id`, `title`, `description`, `url`, `expdate`, `cover_url`) "
-                               "VALUES (%s, %s, %s, %s, %s, %s)",
-                    values=(g.id, g.title, g.description, g.url, g.exp_date, g.thumbnail)
-                )
-            MYSQL.commit(True)
-            print(f"Games list has been saved.")
-        except Exception as e:
-            print(f"Error: [{e}]")
 
     @bot.command(name='get_games', aliases=['epic'])
     async def get_games(ctx: commands.Context):
@@ -295,6 +265,7 @@ def discord_bot():
             print(f"Got game info: {game_info['title']}")
         egs_games_save_to_dbase(ctx, egs.free_games)
 
+    # region SC_SERVER
     @bot.command(name="server_info", aliases=['server-info'])
     @commands.has_permissions(administrator=True)
     async def server_info(ctx: commands.Context):
@@ -370,6 +341,8 @@ def discord_bot():
         except Exception as e:
             await ctx.send(f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
+    # endregion
+
     @bot.command(name="custom_help", aliases=["help"])
     @commands.has_permissions(administrator=True)
     async def custom_help(ctx: commands.Context):
@@ -405,21 +378,7 @@ def discord_bot():
         emb.set_thumbnail(url=ctx.bot.user.avatar)
         await ctx.send(embed=emb, delete_after=60)
 
-    class ServerStatus(Flag):
-        REGISTERED = True
-        UNREGISTERED = False
-
-    def server_get_status(server_id: int | str = None):
-        try:
-            MYSQL = mysql.MYSQL()
-            MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`=%s",
-                           values=server_id
-                           )
-            MYSQL.close()
-            return ServerStatus(not MYSQL.empty)
-        except Exception as e:
-            print(e)
-
+    # endregion
     @bot.event
     async def on_ready():
         await bot.wait_until_ready()
@@ -434,36 +393,7 @@ def discord_bot():
                 'status': server_get_status(server.id),
                 'tasks': [],
             }
-            # Check Discord Server
-            # MYSQL_C.connection.connect()
-            # MYSQL_C = mysql.MYSQL()
-            # MYSQL_C.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
-            # if MYSQL_C.empty:
-            #     # Create SERVER row
-            #     MYSQL_C.execute(f"INSERT INTO servers (`id`, `name`) VALUES ('{server.id}', '{server.name}');")
-            #
-            #     MYSQL_C.get_data(f"SELECT * FROM `settings`")
-            #     features = MYSQL_C.data
-            #     # user_query = f"INSERT INTO servers (`id`, `name`) VALUES ('{server.id}', '{server.name}');"
-            #     user_query = f"INSERT INTO srv_config (`server_id`, `setting_id`, `value`) VALUES "
-            #     for feature in features:
-            #         user_query += f"('{server.id}', '{feature['id']}', '')"
-            #         user_query += ';' if feature == features[-1] else ','
-            #     MYSQL_C.execute(user_query)
-            # # MYSQL_C.connection.close()
-            #     print(f"Setting for [{server.name}]:[{server.id}] have been made.")
-            # else:
-            #     MYSQL_C.execute(f"DELETE FROM servers WHERE `id`='{server.id}'")
-            #     print(f"Server:[{server.name}]:[{server.id}] is already exist")
             print(f"Server:[{server.name}]:[{server.id}]")
-        # is_ready = bot_settings.get('is_ready')
-        # if is_ready is not None and is_ready:
-        #     channel_id = bot_settings['channel_id']
-        #     d_msg = await bot.get_channel(int(channel_id)).send('Running...')
-        #     ctx = discord.ext.commands.context.Context(message=d_msg, bot=None, view=None)
-        #     await asyncio.sleep(1)
-        #     await d_msg.delete()
-        #     await bot_start(ctx)
 
     bot.run(token=config.BUNNYBYTE_TOKEN)
 
