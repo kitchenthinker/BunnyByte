@@ -17,6 +17,7 @@ class YTParser:
         self.channel: Channel = Channel(url=self.channel_url)
         self.last_video: YouTube | None = None
         self.current_video: YouTube | None = None
+        self.current_livestream: YouTube | None = None
         self.is_livestream: bool = False
         self.fetch_last_video()
 
@@ -31,6 +32,17 @@ class YTParser:
 
     def set_current_video(self, video: YouTube):
         self.current_video = video
+
+    async def get_last_livestream(self, max_index: int = 7):
+        streams_slice = [x for x in self.channel.videos[:max_index] if x.length == 0]
+        self.current_livestream = streams_slice[0] if streams_slice else None
+        # streams_slice = [x for x in self.channel.videos[:max_index] if x.length == 0]
+        # self.current_livestream = streams_slice[0] if not streams_slice
+        # count = len(self.channel.videos)
+        # if count == 0:
+        #     return
+        # end_ = count if count <= max_index else max_index
+        # self.current_livestream = None if count == 0 else [x for x in self.channel.videos[:end_] if x.length == 0][0]
 
     @staticmethod
     def get_video_info(video: YouTube):

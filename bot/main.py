@@ -239,11 +239,18 @@ def discord_bot():
     async def yt_last_video(channel_for_notification: discord.TextChannel,
                             yt_channel: YTParser = YTParser(BUNNY_CHANNEL_ID),
                             enable_description: int = 0):
-
-        video_info, emb, view_ = yt_channel.get_discord_video_card(yt_channel.current_video,
+        current_video = yt_channel.current_video
+        await yt_channel.get_last_livestream()
+        if yt_channel.current_livestream is not None:
+            current_video = yt_channel.current_livestream
+        video_info, emb, view_ = yt_channel.get_discord_video_card(current_video,
                                                                    bool(enable_description))
         print(f"Fetching video info: {video_info['title']}")
-        await channel_for_notification.send(embed=emb, view=view_)
+        await channel_for_notification.send(content="Live", embed=emb, view=view_)
+        if yt_channel.current_livestream is not None:
+            BOT_LOCAL_CONFIG[channel_for_notification.guild.id]['tasks'].get('ytb').cancel()
+            print('Cancel')
+
         yt_video_save_to_dbase(yt_channel.current_video)
         print(f"Got video info: {video_info['title']}")
 
@@ -258,6 +265,7 @@ def discord_bot():
                                   check_minutes: int = 59):
         # await ctx.response.defer(ephemeral=False)
         #checking Yt_CHANneL
+        yt_channel = YTParser()
         server = ctx.guild
         if not await is_server_registered(ctx, server):
             return
@@ -278,7 +286,7 @@ def discord_bot():
             await delete_discord_message(ctx, 5)
 
             bot_channel = bot.get_channel(ctx.channel_id)
-            task_to_run.start(bot_channel, yt_channel_url)
+            task_to_run.start(bot_channel, yt_channel)
             print(f"The loop is alive on {server.name}")
 
     @bot.tree.command(name="bb_ytube_stop",
