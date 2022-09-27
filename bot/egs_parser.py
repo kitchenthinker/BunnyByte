@@ -6,6 +6,7 @@ from discord import ButtonStyle
 from discord.ui import Button, View
 from typing import List
 
+
 class EGSGame:
 
     def __init__(self, **game_info):
@@ -36,8 +37,10 @@ class EGSGame:
 
         embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!")
         embed_card.set_image(url=self.thumbnail)
-        thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
-        embed_card.set_thumbnail(url="attachment://epic_logo.png")
+        # thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
+        embed_card.set_thumbnail(
+            url="https://cdn.icon-icons.com/icons2/2428/PNG/128/epic_games_black_logo_icon_147139.png")
+        # embed_card.set_thumbnail(url="attachment://epic_logo.png")
         embed_card.add_field(name="Спеши до:", value=datetime.datetime.strftime(self.exp_date, "%d.%m.%y %H:%M"))
         game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕",
                              style=ButtonStyle.red,
@@ -49,7 +52,7 @@ class EGSGame:
         #     'embed_': embed_card,
         #     'component_': video_button,
         # }
-        return game_card_info, embed_card, dc_view, thumbnail_file
+        return game_card_info, embed_card, dc_view #, thumbnail_file
 
 
 class EGSGamesParser:
@@ -88,7 +91,7 @@ class EGSGamesParser:
                     url = fg['catalogNs']['mappings'][0]['pageSlug']
                     img = [x['url'] for x in fg['keyImages'] if x['type'] == 'OfferImageWide'][0]
                     str_date = fg['promotions']['promotionalOffers'][0]['promotionalOffers'][0]['endDate']
-                    #r_date = parser.isoparse(str_date)
+                    # r_date = parser.isoparse(str_date)
                     exp_date = datetime.datetime.strptime(str_date, "%Y-%m-%dT%H:%M:%S.%fZ")
                     fg_item = {
                         "id": fg['id'],

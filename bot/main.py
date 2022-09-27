@@ -315,9 +315,9 @@ def discord_bot():
     async def get_games(ctx: commands.Context):
         egs = EGSGamesParser()
         for egs_game in egs.free_games:
-            game_info, emb, view_, file_ = egs_game.get_discord_game_card()
+            game_info, emb, view_ = egs_game.get_discord_game_card()
             print(f"Fetching game info: {game_info['title']}")
-            await ctx.send(embed=emb, view=view_, file=file_)
+            await ctx.send(embed=emb, view=view_)
             print(f"Got game info: {game_info['title']}")
         egs_games_save_to_dbase(ctx, egs.free_games)
 
