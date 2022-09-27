@@ -38,6 +38,17 @@ class ServerStatus(Flag):
 
 
 # endregion
+
+def simple_try_except_decorator(func):
+    def wrapper(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            print(f"Error: {e}")
+
+    return wrapper
+
+
 def is_user_admin(ctx: commands.Context | Interaction):
     return ctx.author.guild_permissions.administrator
 
@@ -93,16 +104,17 @@ def egs_games_save_to_dbase(server: commands.Context, games_list: List[EGSGame])
         print(f"Error: [{e}]")
 
 
+@simple_try_except_decorator
 def server_get_status(server_id: int | str = None):
-    try:
-        MYSQL = mysql.MYSQL()
-        MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`=%s",
-                       values=server_id
-                       )
-        MYSQL.close()
-        return ServerStatus(not MYSQL.empty)
-    except Exception as e:
-        print(e)
+    # try:
+    MYSQL = mysql.MYSQL()
+    MYSQL.get_data(f"SELECdT * FROM `servers` WHERE `id`=%s",
+                   values=server_id
+                   )
+    MYSQL.close()
+    return ServerStatus(not MYSQL.empty)
+    # except Exception as e:
+    #     print(e)
 
 
 def server_get_bot_channel(server_id: int | str = None):
@@ -157,6 +169,18 @@ def discord_bot():
             await msg.delete()
         elif isinstance(msg, discord.Interaction):
             await msg.delete_original_response()
+
+    async def is_server_registered(ctx: discord.Interaction, server: discord.Guild, context: str = None,
+                                   delete_after: bool = True, delete_after_sec: int = 5) -> bool:
+        status = local_get_status(server.id) == ServerStatus.UNREGISTERED
+        if status:
+            if context is None:
+                context = f'Server **{server.name}** Unregistered'
+            print(context)
+            await ctx.edit_original_response(content=context)
+            if delete_after:
+                await delete_discord_message(ctx, delete_after_sec)
+        return not status
 
     # region Interactions
     @bot.tree.command(name="test1")
@@ -217,24 +241,39 @@ def discord_bot():
         await delete_discord_message(ctx, 30)
 
     # LOOPS
+    # region YOUTUBE_PARSER
+    async def yt_last_video(channel_for_notification: discord.TextChannel,
+                            yt_channel: YTParser = YTParser(BUNNY_CHANNEL_ID),
+                            enable_description: int = 0):
+        try:
+            yt_channel.get_last_video()
+            video_info, emb, view_ = yt_channel.get_discord_video_card(yt_channel.current_video,
+                                                                       bool(enable_description))
+            print(f"Fetching video info: {video_info['title']}")
+            await channel_for_notification.send(embed=emb, view=view_)
+            yt_video_save_to_dbase(yt_channel.current_video)
+            print(f"Got video info: {video_info['title']}")
+        except Exception as e:
+            print(e)
+
     @bot.tree.command(name="bb_ytube",
                       description="Enable YouTube Notificator.")
-    @app_commands.describe(yt_channel_url="YouTube channel ID", yt_minutes_delay="Check new video every X minutes.")
+    @app_commands.describe(yt_channel_url="YouTube Channel URL",
+                           check_hours="Check new video every X hours.",
+                           check_minutes="Check new video every X minutes.")
     @commands.has_permissions(administrator=True)
-    async def ytube_service_start(ctx: Interaction, yt_channel_url: str, yt_minutes_delay: int = 2):
+    async def ytube_service_start(ctx: Interaction, yt_channel_url: str, check_hours: int = 0, check_minutes: int = 59):
         try:
             await ctx.response.defer(ephemeral=False)
             server = ctx.guild
-            if local_get_status(server.id) == ServerStatus.UNREGISTERED:
-                print(f'Server **{server.name}** Unregistered')
-                await ctx.edit_original_response(content=f'Server **{server.name}** Unregistered')
-                await delete_discord_message(ctx, 5)
+            if not is_server_registered(ctx, server):
                 return
 
             task_to_run: tasks.Loop | None = BOT_LOCAL_CONFIG[server.id]['tasks'].get('ytb')
 
             if task_to_run is None:
-                new_task = BOT_LOCAL_CONFIG[server.id]['tasks']['ytb'] = tasks.loop(minutes=yt_minutes_delay)(
+                new_task = BOT_LOCAL_CONFIG[server.id]['tasks']['ytb'] = tasks.loop(hours=check_hours,
+                                                                                    minutes=check_minutes)(
                     yt_last_video)
                 task_to_run = new_task
             if task_to_run.is_running():
@@ -244,7 +283,9 @@ def discord_bot():
             else:
                 await ctx.edit_original_response(content=f"The loop is alive on {server.name}")
                 await delete_discord_message(ctx, 5)
-                task_to_run.start(ctx, yt_channel_url)
+
+                bot_channel = bot.get_channel(ctx.channel_id)
+                task_to_run.start(bot_channel, yt_channel_url)
                 print(f"The loop is alive on {server.name}")
         except Exception as e:
             await ctx.edit_original_response(
@@ -258,10 +299,7 @@ def discord_bot():
         try:
             await ctx.response.defer(ephemeral=False)
             server = ctx.guild
-            if local_get_status(server.id) == ServerStatus.UNREGISTERED:
-                print(f'Server **{server.name}** Unregistered')
-                await ctx.edit_original_response(content=f'Server **{server.name}** Unregistered')
-                await delete_discord_message(ctx, 5)
+            if not is_server_registered(ctx, server):
                 return
 
             task_to_run: tasks.Loop | None = BOT_LOCAL_CONFIG[server.id]['tasks'].get('ytb')
@@ -279,34 +317,7 @@ def discord_bot():
             await ctx.edit_original_response(
                 content=f"Something went wrong [{e}]. Try again or send me a message and we will do something.")
 
-    @bot.command()
-    async def l_stop(ctx: commands.Context):
-        server = ctx.guild
-        task_to_run: tasks.Loop | None = SERVER_TASKS.get(server.id)
-        if task_to_run is None:
-            print(f"Nothing to stop on {server.name}")
-            return
-        task_to_run.cancel()
-        print(f"The loop is shut down on {server.name}")
-
-    async def first_loop(ctx: commands.Context):
-        await ctx.send(f'Hi, looser! **{ctx.author.name}** from **{ctx.guild.name}** server')
-
-    async def yt_last_video(ctx: discord.Interaction,
-                            yt_channel_url: str = BUNNY_CHANNEL_ID,
-                            enable_description: int = 0):
-        try:
-            yt_channel = YTParser(yt_channel_url)
-            yt_channel.get_last_video()
-            video_info, emb, view_ = yt_channel.get_discord_video_card(yt_channel.current_video,
-                                                                       bool(enable_description))
-            print(f"Fetching video info: {video_info['title']}")
-            bot_channel = bot.get_channel(ctx.channel_id)
-            await bot_channel.send(embed=emb, view=view_)
-            yt_video_save_to_dbase(yt_channel.current_video)
-            print(f"Got video info: {video_info['title']}")
-        except Exception as e:
-            print(e)
+    # endregion
 
     @bot.command(name='get_games', aliases=['epic'])
     async def get_games(ctx: commands.Context):
@@ -356,10 +367,8 @@ def discord_bot():
 
         try:
             server_status = local_get_status(server.id)
-            if server_status == ServerStatus.UNREGISTERED:
-                await ctx.edit_original_response(
-                    content="Hey, Bunny! You need to be registered before changing something :)")
-                await delete_discord_message(ctx, 5)
+            if not is_server_registered(ctx, server,
+                                        f"Hey, Bunny from **{server.name}**! You need to be registered before changing something :)"):
                 return
             if bot_channel.id == local_get_bot_channel(server.id):
                 await ctx.edit_original_response(
@@ -446,11 +455,11 @@ def discord_bot():
             SRV_STATUS = BOT_LOCAL_CONFIG[server.id]['status']
             # MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`='{server.id}'")
             # if MYSQL.empty:
-            if SRV_STATUS == ServerStatus.UNREGISTERED:
-                await ctx.edit_original_response(
-                    content=f"Your Server [**{server.name}**]:[**{server.id}**] hasn't been registered. Aborted.")
-                await delete_discord_message(ctx)
+            if not is_server_registered(ctx, server=server,
+                                        context=f"Your Server [**{server.name}**]:[**{server.id}**] hasn't been registered. Aborted.",
+                                        delete_after=False):
                 return
+
             MYSQL.execute(f"DELETE FROM servers WHERE `id`='{server.id}'")
             MYSQL.commit(True)
             local_flush_server_settings(server.id)
