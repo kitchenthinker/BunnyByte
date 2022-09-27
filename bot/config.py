@@ -2,7 +2,9 @@
 import os
 from dotenv import load_dotenv
 
-configs = load_dotenv('../../.discord_env')
+file_path = "../../.discord_env"
+if os.path.exists(file_path):
+    configs = load_dotenv(file_path)
 
 # DISCORD
 BUNNYBYTE_TOKEN = os.getenv("DISCORD_BUNNYBYTE_TOKEN")
