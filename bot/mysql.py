@@ -35,19 +35,19 @@ class MYSQL:
     def _data_is_empty(self):
         self.empty = self.rowcount == 0
 
-    def execute(self, user_query: str, values=None, commit=False):
+    def execute(self, user_query: str, values=None, commit=False, close_connection: bool = False):
         c = self.connection
         cursor = self.cursor
         cursor.execute(user_query, values)
         if commit:
-            self.commit()
+            self.commit(close_connection)
 
-    def executemany(self, user_query: str, values=None, commit=False):
+    def executemany(self, user_query: str, values=None, commit=False, close_connection: bool = False):
         c = self.connection
         cursor = self.cursor
         cursor.executemany(user_query, values)
         if commit:
-            self.commit()
+            self.commit(close_connection)
 
     def commit(self, close_connection: bool = False):
         c = self.connection

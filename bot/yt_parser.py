@@ -8,6 +8,7 @@ from discord.ui import Button, View
 
 YT_URL = "https://www.youtube.com/channel"
 BUNNY_CHANNEL_ID = "https://www.youtube.com/channel/UCuS7pDu3Pyrk0fXOL_TnCNQ"
+LIVESTREAM_IMG = "https://hi825v5k4m5zy0tvn2xkkpoj7wr51i.ext-twitch.tv/hi825v5k4m5zy0tvn2xkkpoj7wr51i/1.0.1/f7d413efc3b9ca91b682d443ae8e46e6/img/heart_1000a.gif"
 
 
 class YTParser:
@@ -15,17 +16,21 @@ class YTParser:
     def __init__(self, channel_id: str = BUNNY_CHANNEL_ID):
         self.channel_url = f"{channel_id}"
         self.channel: Channel = Channel(url=self.channel_url)
-        self.last_video: YouTube | None = None
         self.current_video: YouTube | None = None
         self.current_livestream: YouTube | None = None
         self.is_livestream: bool = False
-        self.fetch_last_video()
+        self.channel_is_empty: bool = self.is_channel_empty()
+        self.fetch_last_videos()
 
-    def fetch_last_video(self):
-        if self.channel.__len__() > 0:
-            self.last_video = self.channel.videos[0]
-            self.set_current_video(self.last_video)
-            self.set_is_livestream(self.last_video)
+    def is_channel_empty(self):
+        return self.channel.__len__() == 0
+
+    def fetch_last_videos(self):
+        if not self.channel_is_empty:
+            last_video = self.channel.videos[0]
+            self.set_current_video(last_video)
+            self.set_is_livestream(last_video)
+            self.get_last_livestream()
 
     def set_is_livestream(self, video: YouTube):
         self.is_livestream = video.length == 0
@@ -33,16 +38,9 @@ class YTParser:
     def set_current_video(self, video: YouTube):
         self.current_video = video
 
-    async def get_last_livestream(self, max_index: int = 7):
+    def get_last_livestream(self, max_index: int = 7):
         streams_slice = [x for x in self.channel.videos[:max_index] if x.length == 0]
         self.current_livestream = streams_slice[0] if streams_slice else None
-        # streams_slice = [x for x in self.channel.videos[:max_index] if x.length == 0]
-        # self.current_livestream = streams_slice[0] if not streams_slice
-        # count = len(self.channel.videos)
-        # if count == 0:
-        #     return
-        # end_ = count if count <= max_index else max_index
-        # self.current_livestream = None if count == 0 else [x for x in self.channel.videos[:end_] if x.length == 0][0]
 
     @staticmethod
     def get_video_info(video: YouTube):
@@ -58,7 +56,7 @@ class YTParser:
             # video.vid_info['videoDetails'].get('IsLive') not is None
         }
 
-    def get_discord_video_card(self, video: YouTube, show_description: bool = False):
+    def get_discord_video_card(self, video: YouTube, show_description: bool = False, is_livestream: bool = False):
         video_info = self.get_video_info(video)
         video_description = video_info['description'] if show_description else None
         embed_card = discord.Embed(title=video_info['title'],
@@ -70,13 +68,9 @@ class YTParser:
         # embed_card.set_thumbnail(url='./img/yt_logo.png')
         embed_card.set_author(name=video_info['author'])
         embed_card.set_image(url=video_info['thumbnail_url'])
-        video_button = Button(label="🐰 Смотреть 🥕",
-                              style=ButtonStyle.red,
-                              url=video_info['watch_url'])
+        if is_livestream:
+            embed_card.set_thumbnail(url=LIVESTREAM_IMG)
+        video_button = Button(label="🐰 Смотреть 🥕", style=ButtonStyle.red, url=video_info['watch_url'])
         dc_view = View()
         dc_view.add_item(video_button)
-        # video_card = {
-        #     'embed_': embed_card,
-        #     'component_': video_button,
-        # }
         return video_info, embed_card, dc_view

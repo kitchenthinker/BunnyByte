@@ -6,6 +6,8 @@ from discord import ButtonStyle
 from discord.ui import Button, View
 from typing import List
 
+EPICLOGO_IMG = "https://cdn.icon-icons.com/icons2/2428/PNG/128/epic_games_black_logo_icon_147139.png"
+
 
 class EGSGame:
 
@@ -38,21 +40,14 @@ class EGSGame:
         embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!")
         embed_card.set_image(url=self.thumbnail)
         # thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
-        embed_card.set_thumbnail(
-            url="https://cdn.icon-icons.com/icons2/2428/PNG/128/epic_games_black_logo_icon_147139.png")
+        embed_card.set_thumbnail(url=EPICLOGO_IMG)
+        # url="https://hi825v5k4m5zy0tvn2xkkpoj7wr51i.ext-twitch.tv/hi825v5k4m5zy0tvn2xkkpoj7wr51i/1.0.1/f7d413efc3b9ca91b682d443ae8e46e6/img/heart_1000a.gif")
         # embed_card.set_thumbnail(url="attachment://epic_logo.png")
         embed_card.add_field(name="Спеши до:", value=datetime.datetime.strftime(self.exp_date, "%d.%m.%y %H:%M"))
-        game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕",
-                             style=ButtonStyle.red,
-                             url=self.url,
-                             )
+        game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕", style=ButtonStyle.red, url=self.url)
         dc_view = View()
         dc_view.add_item(game_button)
-        # video_card = {
-        #     'embed_': embed_card,
-        #     'component_': video_button,
-        # }
-        return game_card_info, embed_card, dc_view #, thumbnail_file
+        return game_card_info, embed_card, dc_view  # , thumbnail_file
 
 
 class EGSGamesParser:
@@ -67,6 +62,7 @@ class EGSGamesParser:
         }
         self.fp_url = 'https://store.epicgames.com/p/'
         self.free_games: List[EGSGame] = []
+        self.empty: bool = True
         self.refresh()
 
     def get_games_data_from_api(self):
@@ -77,6 +73,7 @@ class EGSGamesParser:
 
     def refresh(self):
         self.get_free_games()
+        self.empty = self.free_games.__len__() == 0
 
     def get_free_games(self):
         data = self.get_games_data_from_api()
