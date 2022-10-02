@@ -4,7 +4,6 @@ import pymysql.cursors
 
 
 class MYSQL:
-
     def __init__(self):
         self.connection = pymysql.connect(host=config.mSQL_H,
                                           user=config.mSQL_L,
