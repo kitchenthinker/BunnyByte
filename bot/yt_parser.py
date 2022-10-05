@@ -7,12 +7,21 @@ from discord import ButtonStyle
 from discord.ui import Button, View
 import aiohttp
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from enum import Enum
 
 YT_URL = "https://www.youtube.com/channel"
 BUNNY_CHANNEL_ID = "https://www.youtube.com/channel/UCuS7pDu3Pyrk0fXOL_TnCNQ"
-LIVESTREAM_IMG = "https://hi825v5k4m5zy0tvn2xkkpoj7wr51i.ext-twitch.tv/hi825v5k4m5zy0tvn2xkkpoj7wr51i/1.0.1/f7d413efc3b9ca91b682d443ae8e46e6/img/heart_1000a.gif"
 
+NOTIFICATION_IMAGE = "https://icon-icons.com/icons2/1283/PNG/128/1497619898-jd24_85173.png"
+LIVESTREAM_IMG = "https://img.informer.com/icons_mac/png/128/448/448535.png"
+
+class YoutubeStreamStatus(Enum):
+    UPCOMING = 1
+    NOTIFIED = 2
+    ONLINE = 3
+    NOTIFIED_ONLINE = 4
+    FINISHED = 5
 
 class YTParser:
 
@@ -20,6 +29,7 @@ class YTParser:
         self.channelURL = f"{channel_id}"
 
         self.channel: Channel = Channel(url=self.channelURL) if create_channel_object else None
+        self.author: str | None = None
         self.currentVideo: YouTube | None = None
         self.currentLiveStream: YouTube | None = None
         self.isLivestream: bool = False
@@ -97,12 +107,17 @@ class YTParser:
                     live = soup.find("link", {"rel": "canonical"})
                     current_livestream = YouTube(live.attrs['href'])
                     if current_livestream.channel_id is not None:
-                        self.isLiveContent = current_livestream.vid_info['videoDetails'].get('isLiveContent', False)
                         self.isUpcoming = current_livestream.vid_info['videoDetails'].get('isUpcoming', False)
+                        self.isLiveContent = False if self.isUpcoming else True
+                        self.author = current_livestream.author
                         if self.isUpcoming:
-                            timestamp = current_livestream.vid_info['playabilityStatus']['liveStreamability']['liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer']['scheduledStartTime']
+                            timestamp = current_livestream.vid_info['playabilityStatus']['liveStreamability'][
+                                'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
+                                'scheduledStartTime']
                             self.upcomingDate = datetime(1970, 1, 1, 0, 0, 0) + timedelta(seconds=int(timestamp))
                     else:
                         current_livestream = None
+                else:
+                    current_livestream = None
         self.currentLiveStream = current_livestream
         return self
