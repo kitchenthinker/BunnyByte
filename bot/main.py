@@ -901,6 +901,7 @@ def discord_bot():
                 else:  # Launched by task manager
                     await bot_channel.send(text)
                     return
+            BOT_CONFIG[server.id]['match_egs'] = db_requests.server_get_matching_egs_list(server.id)
             task_status, task_message = await task_egsgames_create(
                 server=server, check_hours=0, check_minutes=int(egs_settings['repeat']['value']),
                 notification_channel=egs_channel)
@@ -926,6 +927,7 @@ def discord_bot():
                 else:  # Launched by task manager
                     await bot_channel.send(text)
                     return
+            BOT_CONFIG[server.id]['match_ytube'] = db_requests.server_get_matching_ytube_list(server.id)
             task_status, task_message = await task_ytube_create(
                 server=server, check_hours=0, check_minutes=int(ytube_settings['repeat']['value']),
                 show_description=SettingYesNo(ytube_settings['show_description']['value']),
