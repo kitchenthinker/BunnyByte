@@ -487,7 +487,7 @@ def discord_bot():
             return []
         games_list = BOT_CONFIG[server.id]['spin_wheel']
         return [app_commands.Choice(name=game, value=game) for game in games_list if
-                current.lower() in game.lower()]
+                current.lower() in game.lower()][:24]
 
     async def spinwheel_save_to_db(server, values_row: dict, action: SpinWheelAction):
         db_requests.spinwheel_save_to_server(server, values_row, action)
@@ -610,8 +610,9 @@ def discord_bot():
         async def callback(self, interaction: discord.Interaction):
             # await interaction.response.defer(ephemeral=True)
             params = BOT_CONFIG[interaction.guild.id]['category_filter'][interaction.user.id]
-            descript, search, defer, list_view = params['descript'], params['search'], params['defer'], params[
-                'list_view']
+            descript, search = params['descript'], params['search']
+            defer, list_view = params['defer'], params['list_view']
+            await interaction.response.defer(ephemeral=defer)
             del params
             del BOT_CONFIG[interaction.guild.id]['category_filter'][interaction.user.id]
             await spinwheel_show(interaction, descript=descript, search=search, filter=''.join(self.values),
@@ -639,7 +640,7 @@ def discord_bot():
                                                         checks=[StartChecks.REGISTRATION]):
             return
         if category_filter is SettingYesNo.Yes:
-            await interaction.response.defer(ephemeral=True)
+            # await interaction.response.defer(ephemeral=True)
             BOT_CONFIG[server.id]['category_filter'] = {
                 interaction.user.id: {"descript": descript, "search": search, "defer": True,
                                       "list_view": list_view.value}}
@@ -665,7 +666,7 @@ def discord_bot():
         if not await passed_checks_before_start_command(server, interaction, checks=[StartChecks.REGISTRATION]):
             return
         if category_filter is SettingYesNo.Yes:
-            await interaction.response.defer(ephemeral=defer)
+            # await interaction.response.defer(ephemeral=defer)
             BOT_CONFIG[server.id]['category_filter'] = {
                 interaction.user.id: {"descript": descript, "search": search, "defer": defer,
                                       "list_view": list_view.value}}
@@ -1014,7 +1015,7 @@ def discord_bot():
         await bot.wait_until_ready()
         await bot.tree.sync()
         logger.info(f"Logged in as {bot.user.name}({bot.user.id})")
-        for group in [group_test, commands_group_ytube, commands_group_egs, commands_group_spinwheel,
+        for group in [commands_group_ytube, commands_group_egs, commands_group_spinwheel,
                       commands_group_server, commands_allowed_to_user]:
             bot.tree.add_command(group, guilds=bot.guilds)
         for server in bot.guilds:
