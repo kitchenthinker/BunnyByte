@@ -3,7 +3,7 @@ from discord import Guild, TextChannel
 import mysql
 from enums import *
 from helpers import (
-    simple_try_except_decorator, logger
+    simple_try_except_decorator, logger, get_right_value_type
 )
 from spinwheel_games import (
     SpinWheelGameStatus, SpinWheelAction
@@ -50,14 +50,30 @@ def server_update_bot_ready(server: Guild, value):
 
 
 @simple_try_except_decorator
+def server_update_settings(server: Guild, settings: dict):
+    MYSQL = mysql.MYSQL()
+    settings_list = [(setting['value'], setting['setting_id'], server.id) for setting in settings.values()]
+    MYSQL.executemany(user_query="UPDATE srv_config SET `value` = %s WHERE `setting_id` = %s and `server_id` = %s",
+                      values=settings_list)
+    MYSQL.commit(True)
+
+
+@simple_try_except_decorator
 def server_get_settings(server_id: int | str = None):
     def return_setting_dict(feature_name: str):
-        return {x['name']: x for x in (item for item in MYSQL.data if item['fname'] == feature_name)}
+        def get_item(item: dict):
+            ml = {'bool': bool, 'int': int}
+            f = ml.get(item['type'])
+            if f is not None:
+                item['value'] = int(item['value'])
+            return item
+
+        return {x['name']: get_item(x) for x in (item for item in MYSQL.data if item['fname'] == feature_name)}
 
     MYSQL = mysql.MYSQL()
     MYSQL.get_data(
         user_query="SELECT settings.name, srv_config.value, settings.`type`, "
-                   "settings.description, features.name AS fname\n"
+                   "settings.description, srv_config.setting_id, features.name AS fname\n"
                    "FROM srv_config\n"
                    "LEFT JOIN settings\n"
                    "ON srv_config.setting_id = settings.id\n"
@@ -85,6 +101,7 @@ def server_get_matching_ytube_list(server_id: int | str = None):
                 return YoutubeStreamStatus(item)
             else:
                 return item
+
         return {row['video_id']: {key: get_sub_dict(key, item) for key, item in row.items()} for row in MYSQL.data}
 
     MYSQL = mysql.MYSQL()
@@ -134,11 +151,11 @@ def server_delete_bot_registration(server_id: int | str = None):
 
 
 @simple_try_except_decorator
-def server_signup(server: Guild, bot_channel: TextChannel):
+async def server_signup(server: Guild, bot_channel: TextChannel):
     MYSQL = mysql.MYSQL()
     MYSQL.get_data(f"SELECT * FROM `settings`")
     features = MYSQL.data
-    asyncio.sleep(1)
+    await asyncio.sleep(1)
 
     MYSQL.execute(
         user_query=f"INSERT INTO servers (`id`, `name`) VALUES (%s, %s)",
@@ -146,12 +163,13 @@ def server_signup(server: Guild, bot_channel: TextChannel):
     )
     logger.info(f"Creating settings for [**{server.name}**]:[**{server.id}**]...")
     user_query = f"INSERT INTO srv_config (`server_id`, `setting_id`, `value`) VALUES (%s, %s, %s) "
-    value_list = [(server.id, feature['id'], (False if feature['type'] == 'bool' else None)) for feature in features]
+
+    value_list = [(server.id, feature['id'], get_right_value_type(feature['type'])) for feature in features]
     # MYSQL.commit()
     MYSQL.executemany(user_query, value_list)
     MYSQL.execute('INSERT INTO bot_config (service_channel, server_id, ready) VALUES (%s, %s, %s)',
                   values=(bot_channel.id, server.id, True))
-    asyncio.sleep(1)
+    await asyncio.sleep(1)
     MYSQL.commit(True)
 
 
@@ -209,6 +227,13 @@ def ytube_get_streams_data(server_id, video_id):
 
 
 @simple_try_except_decorator
+def ytube_delete_finished_streams(server: Guild):
+    MYSQL = mysql.MYSQL()
+    MYSQL.execute("DELETE FROM yt_videos WHERE `server_id` = %s and `status` = 4", values=server.id)
+    MYSQL.commit(True)
+
+
+@simple_try_except_decorator
 def ytube_save_video_to_dbase(server: Guild, yt_stream: YouTubeLiveStream,
                               status: YoutubeStreamStatus, is_update: bool = False):
     MYSQL = mysql.MYSQL()
@@ -217,8 +242,8 @@ def ytube_save_video_to_dbase(server: Guild, yt_stream: YouTubeLiveStream,
             user_query="INSERT INTO yt_videos "
                        "(`server_id`,`video_id`, `title`, `author`, `publish_date`, "
                        "`upcoming_date`, `thumbnail_url`, `watch_url`, "
-                       "`description`, `greeting` `upcoming`, `livestream`, `status`) "
-                       "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                       "`description`, `greeting`, `upcoming`, `livestream`, `status`) "
+                       "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             values=(server.id, yt_stream.video_id, yt_stream.title, yt_stream.author, yt_stream.publish_date,
                     yt_stream.upcoming_date, yt_stream.thumbnail_url, yt_stream.watch_url,
                     '', yt_stream.greeting, yt_stream.upcoming, yt_stream.livestream, status.value)
@@ -233,7 +258,7 @@ def ytube_save_video_to_dbase(server: Guild, yt_stream: YouTubeLiveStream,
             values=(yt_stream.title, yt_stream.author, yt_stream.publish_date,
                     yt_stream.upcoming_date, yt_stream.thumbnail_url, yt_stream.watch_url,
                     yt_stream.upcoming, yt_stream.livestream, status.value,
-                    server.id, yt_stream.video_id, )
+                    server.id, yt_stream.video_id,)
         )
     MYSQL.commit(True)
     logger.info(f"YT-video has been saved.")

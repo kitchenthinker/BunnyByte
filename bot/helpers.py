@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 def utc_time_now() -> datetime.datetime:
     return utcnow().replace(tzinfo=None)
 
+
 def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelta'):
     """Convert a datetime.timedelta object or a regular number to a custom-
     formatted string, just like the stftime() method does for datetime.datetime
@@ -100,25 +101,40 @@ def discord_async_try_except_decorator(func):
     return wrapper
 
 
-FAQ_ADMIN = f"[**.server-register <#service-channel>**]\n" \
-            f"- Зарегистрировать сервер для работы бота. Нужно создать приватный канал и дать доступ боту.\n" \
-            f"- Пример: .server-register #приватный-канал\n" \
-            f"{'--' * 20}\n" \
-            f"- Register the bot. You need to create a private channel and give permission to bot.\n" \
-            f"- Example: .server-register #private-channel\n\n" \
-            f"[**.server-delete**]\n" \
-            f"- Прекратить работу бота. Все настройки будут удалены!!! Чтобы запустить бота снова, нужно пройти регистрацию.\n" \
-            f"--------------------------------------------\n" \
-            f"- Shut down the bot. All bot setting will be deleted!!! You need to register server if you wanna start it again.\n\n" \
-            f"[**.server-csc <#service-channel>**]\n" \
-            f"- Сменить канал для вывода сервисных сообщений.\n" \
-            f"--------------------------------------------\n" \
-            f"- Change service channel for receiving service bots notification.\n\n" \
-            f"[**.server-info**]\n" \
-            f"- Показать информацию о сервере.\n" \
-            f"--------------------------------------------\n" \
-            f"- Show up server info.\n"
+def get_right_value_type(t: str):
+    value = None
+    if t == 'bool': value = False
+    if t == 'int': value = 0
+    if t == 'str': value = ''
+    return value
 
-FAQ_USER = f"[**.server-register <#service-channel>**]\n" \
-           f"- Зарегистрировать сервер для работы бота. Нужно создать приватный канал и дать доступ боту.\n" \
-           f"- Пример: .server-register #приватный-канал\n"
+
+FAQ_ADMIN = f"First of all, you need register your server, then you can do whatever you want. " \
+            f"For instance, launch EGS and YouTube Notificators." \
+            f"Also, there's a SpinWheel that will help you manage your Game Lists." \
+            f"Sorry for not having mother-tongue HELP, I've just fed up with switching keyboard constantly :). " \
+            f"Maybe, one day..." \
+            f"I have no thoughts that YOU may fail, I believe in you!" \
+    # f""f"[**.server-register <#service-channel>**]\n" \
+# f"- Зарегистрировать сервер для работы бота. Нужно создать приватный канал и дать доступ боту.\n" \
+# f"- Пример: .server-register #приватный-канал\n" \
+# f"{'--' * 20}\n" \
+# f"- Register the bot. You need to create a private channel and give permission to bot.\n" \
+# f"- Example: .server-register #private-channel\n\n" \
+# f"[**.server-delete**]\n" \
+# f"- Прекратить работу бота. Все настройки будут удалены!!! Чтобы запустить бота снова, нужно пройти регистрацию.\n" \
+# f"--------------------------------------------\n" \
+# f"- Shut down the bot. All bot setting will be deleted!!! You need to register server if you wanna start it again.\n\n" \
+# f"[**.server-csc <#service-channel>**]\n" \
+# f"- Сменить канал для вывода сервисных сообщений.\n" \
+# f"--------------------------------------------\n" \
+# f"- Change service channel for receiving service bots notification.\n\n" \
+# f"[**.server-info**]\n" \
+# f"- Показать информацию о сервере.\n" \
+# f"--------------------------------------------\n" \
+# f"- Show up server info.\n"
+
+FAQ_USER = f"[**/bb_user show_spin_wheel**]\n" \
+           f"- Показать рулетку. Тебе доступны фильтры и поиск. Дерзай! .\n" \
+           "[**/bb_user joke**]\n" \
+           f"- Хочешь анекдот расскажу?.\n"

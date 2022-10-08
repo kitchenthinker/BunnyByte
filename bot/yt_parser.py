@@ -40,10 +40,10 @@ class YouTubeLiveStream(YouTube):
             'author': self.author,
             'greeting': self.greeting,
             'publish_date': self.publish_date,
-            'upcoming_date': self.publish_date,
+            'upcoming_date': self.upcoming_date,
             'thumbnail_url': self.thumbnail_url,
             'watch_url': self.watch_url,
-            'livestream': self.upcoming,
+            'livestream': self.livestream,
             'upcoming': self.upcoming,
             'status': stream_status,
         }
@@ -57,6 +57,8 @@ class YouTubeLiveStream(YouTube):
         embed_card.set_image(url=video_info['thumbnail_url'])
         if video_info['livestream']:
             embed_card.set_thumbnail(url=LIVESTREAM_IMG)
+        if video_info['upcoming']:
+            embed_card.set_thumbnail(url=NOTIFICATION_IMAGE)
         video_button = Button(label="🐰 Смотреть 🥕", style=ButtonStyle.red, url=video_info['watch_url'])
         dc_view = View()
         dc_view.add_item(video_button)

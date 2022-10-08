@@ -169,7 +169,7 @@ def discord_bot():
 
         return True
 
-    async def create_task_ytube(server: discord.Guild, check_hours: int, check_minutes: int,
+    async def task_ytube_create(server: discord.Guild, check_hours: int, check_minutes: int,
                                 show_description: SettingYesNo,
                                 notification_time_before: int, yt_channel_url: str,
                                 notification_channel: discord.TextChannel):
@@ -193,10 +193,11 @@ def discord_bot():
             ytube['channel_id']['value'] = notification_channel.id
             ytube['show_description']['value'] = bool(show_description.value)
 
+            db_requests.server_update_settings(server, ytube)
             task_to_run.start(server, notification_channel, yt_channel_url, show_description.value)
             return True, logger_save_and_return_text(f"YT-Notificator is alive on {server.name}")
 
-    async def stop_task_ytube(server: discord.Guild):
+    async def task_ytube_stop(server: discord.Guild):
         ytube = BOT_CONFIG[server.id]['features']['ytube']
         task_to_run: tasks.Loop | None = ytube.get('task')
 
@@ -206,9 +207,11 @@ def discord_bot():
 
         ytube['task'] = None
         ytube['settings']['enable']['value'] = False
+
+        db_requests.server_update_settings(server, ytube['settings'])
         return True, logger_save_and_return_text(f"The loop is shut down on {server.name}")
 
-    async def create_task_egsgames(server: discord.Guild, check_hours: int, check_minutes: int,
+    async def task_egsgames_create(server: discord.Guild, check_hours: int, check_minutes: int,
                                    notification_channel: discord.TextChannel):
         egs_service = BOT_CONFIG[server.id]['features']['egs']
         task_to_run: tasks.Loop | None = egs_service.get('task')
@@ -219,22 +222,25 @@ def discord_bot():
         if task_to_run.is_running():
             return False, logger_save_and_return_text(f"EGS-Notificator is already running on {server.name}")
         else:
-            egs_service['settings']['enable']['value'] = True
-            egs_service['settings']['repeat']['value'] = full_minutes
-            egs_service['settings']['channel_id']['value'] = notification_channel.id
-
+            egs_service = egs_service['settings']
+            egs_service['enable']['value'] = True
+            egs_service['repeat']['value'] = full_minutes
+            egs_service['channel_id']['value'] = notification_channel.id
+            db_requests.server_update_settings(server, egs_service)
             task_to_run.start(server, notification_channel)
             return True, logger_save_and_return_text(f"EGS-Notificator is alive on {server.name}")
 
-    async def stop_task_egsgames(server: discord.Guild):
-        task_to_run: tasks.Loop | None = BOT_CONFIG[server.id]['features']['egs']['task']
+    async def task_egsgames_stop(server: discord.Guild):
+        egs_service = BOT_CONFIG[server.id]['features']['egs']
+        task_to_run: tasks.Loop | None = egs_service['task']
 
         if task_to_run is None:
             return False, logger_save_and_return_text(f"Nothing to stop on {server.name}")
         task_to_run.cancel()
 
-        BOT_CONFIG[server.id]['features']['egs']['task'] = None
-        BOT_CONFIG[server.id]['features']['egs']['settings']['enable']['value'] = False
+        egs_service['task'] = None
+        egs_service['settings']['enable']['value'] = False
+        db_requests.server_update_settings(server, egs_service['settings'])
         return True, logger_save_and_return_text(f"EGS Notificator is shut down on {server.name}")
 
     # region Interactions
@@ -265,19 +271,24 @@ def discord_bot():
         yt_settings = BOT_CONFIG[server.id]['features']['ytube']['settings']
         server_ready = BOT_CONFIG[server.id]['ready']
 
-        if not all([yt_settings['enable']['value'], server_ready]):
+        if not any([yt_settings['enable']['value'], server_ready]):
             logger.info("Bot or channel isn't ready for launching YT-notificator.")
             return
 
         yt_stream = await YTLiveStreamParser(yt_channel_url).get_last_livestream()
         if yt_stream is None:
+            streams_to_delete = len([x for x in BOT_CONFIG[server.id]['match_ytube'].values()
+                                     if x['status'] is YoutubeStreamStatus.NOTIFIED_ONLINE])
+            if streams_to_delete > 0:
+                db_requests.ytube_delete_finished_streams(server)
             logger.info(f"There's no stream. Channel:({yt_channel_url})")
+
             return
         logger.info(f"Fetching video info: {yt_stream.title}")
 
         video_id = yt_stream.video_id
         server_stream_data = BOT_CONFIG[server.id]['match_ytube']  # db_requests.ytube_get_streams_data(server.id)
-        yt_stream.greeting = server_stream_data.get(video_id, '').get('greeting', '')
+        yt_stream.greeting = server_stream_data.get(video_id, {}).get('greeting', '')
 
         if video_id not in server_stream_data:
             video_status = YoutubeStreamStatus.UPCOMING if yt_stream.upcoming else YoutubeStreamStatus.ONLINE
@@ -313,6 +324,7 @@ def discord_bot():
                 video_info, emb, view_ = yt_stream.get_discord_video_card()
                 await channel_for_notification.send(embed=emb, view=view_)
                 db_requests.ytube_update_stream_status(server.id, video_id, YoutubeStreamStatus.NOTIFIED)
+                local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED))
 
         logger.info(f"Got video info: {yt_stream.title}")
 
@@ -333,9 +345,10 @@ def discord_bot():
                                   check_minutes: app_commands.Range[int, 5] = 59):
         server = ctx.guild
         if not await passed_checks_before_start_command(
-                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION,
-                                     StartChecks.CHANNEL_EXIST, StartChecks.CHANNEL_AVAILABLE]): return
-        task_status, task_message = await create_task_ytube(server, check_hours, check_minutes, show_description,
+                server, ctx, notification_channel, checks=[StartChecks.OWNER, StartChecks.REGISTRATION,
+                                                           StartChecks.CHANNEL_EXIST,
+                                                           StartChecks.CHANNEL_AVAILABLE]): return
+        task_status, task_message = await task_ytube_create(server, check_hours, check_minutes, show_description,
                                                             notification_time_before, yt_channel_url,
                                                             notification_channel)
         await embed_output_server_message(ctx, task_message, True)
@@ -346,8 +359,23 @@ def discord_bot():
         server = ctx.guild
         if not await passed_checks_before_start_command(
                 server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
-        task_status, task_message = await stop_task_ytube(server)
+        task_status, task_message = await task_ytube_stop(server)
         await embed_output_server_message(ctx, task_message)
+
+    @commands_group_ytube.command(name="restart", description="Restart YouTube Notificator.", extras=DEFER_YES)
+    @discord_async_try_except_decorator
+    async def egs_service_restart(ctx: discord.Interaction):
+        server = ctx.guild
+        if not await passed_checks_before_start_command(
+                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
+        task_message = 'YouTube is not ready'
+        r = await check_bot_before_starting_tasks(server)
+        if r['response']:
+            # await task_ytube_restart(server, bot_channel)
+            task_status, task_message = await task_ytube_restart(server)
+
+        await embed_output_server_message(ctx, f"Restart: {task_message}")
 
     async def ytube_video_autocomplete(ctx: discord.Interaction, current: str, ) -> List[app_commands.Choice[str]]:
         server = ctx.guild
@@ -375,17 +403,23 @@ def discord_bot():
                                                                                      StartChecks.REGISTRATION]):
             return
         stream = BOT_CONFIG[server.id]['match_ytube'][video]
-        stream['description'] = description
+        stream['greeting'] = description
         db_requests.ytube_update_upcoming_stream_greeting(server.id, video, description)
-        await interaction.edit_original_response(content=f"Your description has been changed:\n"
+        await interaction.edit_original_response(content=f"Your greeting has been changed:\n"
                                                          f"Stream: **{stream['title']}**\n"
-                                                         f"Description: **{description}**")
+                                                         f"Greetings: **{description}**")
 
     # endregion
 
     # region PARSER_EGS
 
     async def get_games(server, notification_channel: discord.TextChannel):
+        egs_settings = BOT_CONFIG[server.id]['features']['egs']['settings']
+        server_ready = BOT_CONFIG[server.id]['ready']
+
+        if not any([egs_settings['enable']['value'], server_ready]):
+            logger.info("Bot or channel isn't ready for launching YT-notificator.")
+            return
         egs = EGSGamesParser()
         if egs.empty:
             return
@@ -414,7 +448,7 @@ def discord_bot():
                         StartChecks.CHANNEL_AVAILABLE]):
             return
 
-        task_status, task_message = await create_task_egsgames(server, check_hours, check_minutes,
+        task_status, task_message = await task_egsgames_create(server, check_hours, check_minutes,
                                                                notification_channel)
         await embed_output_server_message(ctx, task_message)
 
@@ -425,8 +459,23 @@ def discord_bot():
         if not await passed_checks_before_start_command(
                 server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
             return
-        task_status, task_message = await stop_task_egsgames(server)
+        task_status, task_message = await task_egsgames_stop(server)
         await embed_output_server_message(ctx, task_message)
+
+    @commands_group_egs.command(name="restart", description="Restart EGS Notificator.", extras=DEFER_YES)
+    @discord_async_try_except_decorator
+    async def egs_service_restart(ctx: discord.Interaction):
+        server = ctx.guild
+        if not await passed_checks_before_start_command(
+                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
+        task_message = 'EGS is not ready'
+        r = await check_bot_before_starting_tasks(server)
+        if r['response']:
+            # await task_ytube_restart(server, bot_channel)
+            task_status, task_message = await task_egs_restart(server)
+
+        await embed_output_server_message(ctx, f"Restart: {task_message}")
 
     # endregion
     group_test = app_commands.Group(name="bb_test", description="Testing slash groups")
@@ -467,7 +516,8 @@ def discord_bot():
                             playlist: str = None, comment: str = None):
         server = interaction.guild
         if not await passed_checks_before_start_command(
-                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
 
         game_ = BOT_CONFIG[server.id]['spin_wheel'].get(game)
         if game_ is not None:
@@ -489,7 +539,8 @@ def discord_bot():
                              playlist: str = None, comment: str = None):
         server = interaction.guild
         if not await passed_checks_before_start_command(
-                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
 
         game_ = BOT_CONFIG[server.id]['spin_wheel'].get(game)
         if game_ is None:
@@ -512,7 +563,8 @@ def discord_bot():
     async def spinwheel_delete(interaction: discord.Interaction, game: str):
         server = interaction.guild
         if not await passed_checks_before_start_command(
-                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
 
         game_ = BOT_CONFIG[server.id]['spin_wheel'].get(game)
         if game_ is None:
@@ -526,7 +578,8 @@ def discord_bot():
     async def spinwheel_choice(interaction: discord.Interaction):
         server = interaction.guild
         if not await passed_checks_before_start_command(
-                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
 
         game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
@@ -689,22 +742,22 @@ def discord_bot():
             await ctx.response.send_message(embed=discord.Embed(
                 title="Wow, slow down, mate", description=f"Take your time, mate! {str(error)}"), ephemeral=True)
 
-    @bot.tree.command(name="test_yt", extras=DEFER_YES)
-    @discord_async_try_except_decorator
-    async def test_yt(ctx: discord.Interaction, channel: discord.TextChannel, url: str):
-
-        server = ctx.guild
-        # if not await passed_checks_before_start_command(
-        #         server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
-
-        v = await YTLiveStreamParser(channel_url=url).get_last_livestream()
-        has_perm = channel.permissions_for(channel.guild.me).send_messages
-        emb = discord.Embed(title="Has permission.",
-                            description=f"Bot has permission for channel {channel.name}: {has_perm}")
-        title = None if v is None else v.title
-        date_at = None if v is None else v.upcoming_date
-        await ctx.edit_original_response(
-            content=f"Title, Live,Upcoming, Date:[{title=}, {v.livestream=}, {v.upcoming=}, {date_at}]", embed=emb)
+    # @bot.tree.command(name="test_yt", extras=DEFER_YES)
+    # @discord_async_try_except_decorator
+    # async def test_yt(ctx: discord.Interaction, channel: discord.TextChannel, url: str):
+    #
+    #     server = ctx.guild
+    #     # if not await passed_checks_before_start_command(
+    #     #         server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+    #
+    #     v = await YTLiveStreamParser(channel_url=url).get_last_livestream()
+    #     has_perm = channel.permissions_for(channel.guild.me).send_messages
+    #     emb = discord.Embed(title="Has permission.",
+    #                         description=f"Bot has permission for channel {channel.name}: {has_perm}")
+    #     title = None if v is None else v.title
+    #     date_at = None if v is None else v.upcoming_date
+    #     await ctx.edit_original_response(
+    #         content=f"Title, Live,Upcoming, Date:[{title=}, {v.livestream=}, {v.upcoming=}, {date_at}]", embed=emb)
 
     # region SC_SERVER
     # TODO - SERVER-INFO FINISHED
@@ -713,7 +766,8 @@ def discord_bot():
     async def server_info(ctx: discord.Interaction):
         server = ctx.guild
         if not await passed_checks_before_start_command(
-                server, ctx, checks=[StartChecks.OWNER, ]): return
+                server, ctx, checks=[StartChecks.OWNER, ]):
+            return
 
         bot_channel = bot.get_channel(local_get_bot_channel(server.id))
         bot_channel_name = None if bot_channel is None else bot_channel.name
@@ -734,7 +788,8 @@ def discord_bot():
         server = ctx.guild
         if not await passed_checks_before_start_command(
                 server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION, StartChecks.CHANNEL_EXIST,
-                                     StartChecks.CHANNEL_AVAILABLE, ]): return
+                                     StartChecks.CHANNEL_AVAILABLE, ]):
+            return
 
         if bot_channel.id == local_get_bot_channel(server.id):
             await embed_output_server_message(ctx,
@@ -747,7 +802,8 @@ def discord_bot():
             ctx, f"It's done. **{bot_channel.name}** now is your new service channel.", True)
 
     @commands_group_server.command(name="signup",
-                                   description="Register the bot. You need to create a private channel (mute) & give me permission.",
+                                   description="Register the bot. You need to create a private channel "
+                                               "(mute) & give me permission.",
                                    extras=DEFER_YES)
     @app_commands.describe(bot_channel='Service (Private) Channel for sending messages from bot.')
     @discord_async_try_except_decorator
@@ -760,7 +816,7 @@ def discord_bot():
 
         # Making a registration
         logger.info(f"Creating server row for [**{server.name}**]:[**{server.id}**]...")
-        db_requests.server_signup(server, bot_channel)
+        await db_requests.server_signup(server, bot_channel)
 
         BOT_CONFIG[server.id]['status'] = ServerStatus.REGISTERED
         BOT_CONFIG[server.id]['ready'] = True
@@ -778,7 +834,8 @@ def discord_bot():
     async def server_delete(ctx: discord.Interaction, confirm: SettingYesNo):
         server = ctx.guild
         if not await passed_checks_before_start_command(
-                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
 
         # TODO: Make embed output to user.
         if confirm is SettingYesNo.No:
@@ -787,15 +844,18 @@ def discord_bot():
 
         db_requests.server_delete_bot_registration(server.id)
         local_flush_server_settings(server)
-        await embed_output_server_message(ctx,
-                                          f"Your Server [**{server.name}**]:[**{server.id}**] has been deleted.")
+        await embed_output_server_message(
+            ctx, f"Your Server [**{server.name}**]:[**{server.id}**] has been deleted.")
 
     @commands_group_server.command(name="flush", extras=DEFER_YES)
     @discord_async_try_except_decorator
-    async def flush_setting(ctx: discord.Interaction):
-        local_flush_server_settings(ctx.guild)
-        await bot_load_settings(ctx.guild)
-        await ctx.edit_original_response(content="Done")
+    async def flush_setting(ctx: discord.Interaction, password: str):
+        if password == '!Space@Monkey#':
+            local_flush_server_settings(ctx.guild)
+            await bot_load_settings(ctx.guild)
+            await ctx.edit_original_response(content="Done")
+        else:
+            await ctx.edit_original_response(content="Never guess 😜")
 
     # endregion
 
@@ -823,42 +883,79 @@ def discord_bot():
             message = f"**{owner.name}** A канал для сервисных сообщений на **{server.name}** недоступен. "
         await owner.send(content=message)
 
-    async def run_services_task(server: discord.Guild):
+    async def task_egs_restart(server: discord.Guild, bot_channel: discord.TextChannel = None):
+        egs_service = BOT_CONFIG[server.id]["features"]["egs"]
+        egs_settings = egs_service["settings"]
+
+        if egs_settings['enable']['value']:
+            egs_service['task'] = None
+            egs_channel = bot.get_channel(int(egs_settings['channel_id']['value']))
+
+            if egs_channel is None:
+                text = 'You don\'n have a channel for fetching data from EGS.'
+                if bot_channel is None:  # Launched by slash command
+                    return False, logger_save_and_return_text(text)
+                else:  # Launched by task manager
+                    await bot_channel.send(text)
+                    return
+            task_status, task_message = await task_egsgames_create(
+                server=server, check_hours=0, check_minutes=int(egs_settings['repeat']['value']),
+                notification_channel=egs_channel)
+            if bot_channel is None:
+                return task_status, task_message
+            else:
+                await bot_channel.send(content=task_message)
+        else:
+            if bot_channel is None:
+                return False, logger_save_and_return_text('Service EGS is not ready')
+
+    async def task_ytube_restart(server: discord.Guild, bot_channel: discord.TextChannel = None):
+        ytube_service = BOT_CONFIG[server.id]["features"]["ytube"]
+        ytube_settings = ytube_service["settings"]
+        if ytube_settings['enable']['value']:
+            ytube_service['task'] = None
+            ytube_channel = bot.get_channel(int(ytube_settings['channel_id']['value']))
+
+            if ytube_channel is None:
+                text = 'You don\'n have a channel for fetching data from Youtube.'
+                if bot_channel is None:  # Launched by slash command
+                    return False, logger_save_and_return_text(text)
+                else:  # Launched by task manager
+                    await bot_channel.send(text)
+                    return
+            task_status, task_message = await task_ytube_create(
+                server=server, check_hours=0, check_minutes=int(ytube_settings['repeat']['value']),
+                show_description=SettingYesNo(ytube_settings['show_description']['value']),
+                notification_channel=ytube_channel,
+                notification_time_before=ytube_settings['notification_time']['value'],
+                yt_channel_url=ytube_settings['yt_channel']['value'])
+            if bot_channel is None:
+                return task_status, task_message
+            else:
+                await bot_channel.send(content=task_message)
+        else:
+            if bot_channel is None:
+                return False, logger_save_and_return_text('Service YouTube is not ready')
+
+    async def check_bot_before_starting_tasks(server: discord.Guild):
         server_ready = BOT_CONFIG[server.id]['ready']
         bot_channel = bot.get_channel(BOT_CONFIG[server.id]['bot_channel'])
-
+        result = {"response": False, "bot_channel": bot_channel}
         if server_ready:
-            # TODO Update bot channel setting after deleting channel
-
-            if bot_channel is None:
+            if bot_channel is not None:
+                result.update({"response": True})
+            else:
                 db_requests.server_update_bot_ready(server, False)
                 BOT_CONFIG[server.id]['ready'] = False
                 await send_message_to_server_owner(server)
-                return
-            # TODO: Checking enable before creating channel object
-            ytube_settings = BOT_CONFIG[server.id]["features"]["ytube"]["settings"]
-            ytube_channel = bot.get_channel(int(ytube_settings['channel_id']))
-            if ytube_channel is None:
-                await bot_channel.send('You don\'n have a channel for fetching data from Youtube.')
-                return
-            if ytube_settings['enable']:
-                task_status, task_message = await create_task_ytube(
-                    server=server, check_hours=0, check_minutes=int(ytube_settings['repeat']),
-                    show_description=ytube_settings['show_description'], notification_channel=ytube_channel,
-                    notification_time_before=int(ytube_settings['notification_time']),
-                    yt_channel_url=ytube_settings['yt_channel'])
-                await bot_channel.send(content=task_message)
+        return result
 
-            egs_settings = BOT_CONFIG[server.id]["features"]["egs"]["settings"]
-            egs_channel = bot.get_channel(int(egs_settings['channel_id']))
-            if egs_channel is None:
-                await bot_channel.send('You don\'n have a channel for fetching data from EGS.')
-                return
-            if egs_settings['enable']:
-                task_status, task_message = await create_task_egsgames(
-                    server=server, check_hours=0, check_minutes=int(egs_settings['repeat']),
-                    notification_channel=egs_channel, )
-                await bot_channel.send(content=task_message)
+    async def run_services_task(server: discord.Guild):
+        r = await check_bot_before_starting_tasks(server)
+        if r['response']:
+            bot_channel = r['bot_channel']
+            await task_ytube_restart(server, bot_channel)
+            await task_egs_restart(server, bot_channel)
 
     @tasks.loop(hours=3)
     async def delete_old_data(server: discord.Guild):
@@ -877,9 +974,8 @@ def discord_bot():
                 return
             bot_channel_id = BOT_CONFIG[server.id]['bot_channel']
             if deleted_channel.id == bot_channel_id:
-                owner = server.owner
-                await stop_task_ytube(server)
-                await stop_task_egsgames(server)
+                await task_ytube_stop(server)
+                await task_egsgames_stop(server)
                 db_requests.server_update_bot_ready(server, False)
                 await send_message_to_server_owner(server,
                                                    f"Канал для сервисных сообщений на **{server.name}** недоступен."
@@ -888,11 +984,11 @@ def discord_bot():
             else:
                 task_message = None
                 bot_channel = bot.get_channel(bot_channel_id)
-                if deleted_channel.id == BOT_CONFIG[server.id]['features']['egs']['settings']['channel_id']:
-                    task_status, task_message = await stop_task_egsgames(server)
-                if deleted_channel.id == BOT_CONFIG[server.id]['features']['ytube']['settings']['channel_id']:
-                    task_status, task_message = await stop_task_ytube(server)
-                if task_message is not None:
+                if deleted_channel.id == BOT_CONFIG[server.id]['features']['egs']['settings']['channel_id']['value']:
+                    task_status, task_message = await task_egsgames_stop(server)
+                if deleted_channel.id == BOT_CONFIG[server.id]['features']['ytube']['settings']['channel_id']['value']:
+                    task_status, task_message = await task_ytube_stop(server)
+                if task_message is not None and BOT_CONFIG[server.id]['ready']:
                     await bot_channel.send(content=task_message)
 
     @bot.event
