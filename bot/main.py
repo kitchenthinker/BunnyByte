@@ -328,7 +328,7 @@ def discord_bot():
                 db_requests.ytube_update_stream_status(server.id, video_id, YoutubeStreamStatus.NOTIFIED)
                 local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED))
 
-        logger.info(f"Got video info: {yt_stream.title}")
+        logger.info(f"Got video info: {local_video}")
 
     @commands_group_ytube.command(name="start", description="Enable YouTube Streams Notificator.", extras=DEFER_YES)
     @app_commands.describe(yt_channel_url="YouTube Channel URL",
