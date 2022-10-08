@@ -320,7 +320,7 @@ def discord_bot():
             notification_time = yt_settings['notification_time']['value']
             stream_is_about_to_start = (yt_stream.upcoming_date - utc_time_now()).seconds < notification_time * 60
             logger.info(f"{stream_is_about_to_start=}, {yt_stream.upcoming_date=}, utc=:{utc_time_now()}, "
-                        f"notification time:{notification_time * 60}, delta=:{(yt_stream.upcoming_date - utc_time_now()).seconds/60}")
+                        f"notification time:{notification_time * 60}, delta=:{(yt_stream.upcoming_date - utc_time_now()).seconds / 60}")
             if stream_is_about_to_start:
                 # TODO: Change Video Status to NOTIFIED
                 video_info, emb, view_ = yt_stream.get_discord_video_card()
@@ -590,7 +590,8 @@ def discord_bot():
             await interaction.edit_original_response(content=f'The Game List is empty.')
             return
         game_ = random.choice(game_list)
-        await spinwheel_save_to_db(server, {"game": game_['game'], "status": SpinWheelGameStatus.InProgress,
+        await spinwheel_save_to_db(server, {"game": game_['game'], "new_game": game_['game'],
+                                            "status": SpinWheelGameStatus.InProgress,
                                             "url": game_["url"], "comment": game_["comment"]}, SpinWheelAction.Edit)
         emb = discord.Embed(
             title="Уразайка-Поиграйка!"

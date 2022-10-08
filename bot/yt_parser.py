@@ -81,7 +81,7 @@ class YTLiveStreamParser:
 
     async def get_last_livestream(self) -> YouTubeLiveStream:
         livestream_data = None
-        current_livestream = None
+        current_livestream = self.current_livestream
         async with aiohttp.ClientSession() as session:
             channel_url = f"{self.channel_url}/live"
             async with session.get(channel_url, cookies={'CONSENT': 'YES+42'}) as page:

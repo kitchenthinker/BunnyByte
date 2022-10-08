@@ -281,7 +281,7 @@ def spinwheel_save_to_server(server: Guild, values_row: dict, action: SpinWheelA
     MYSQL = mysql.MYSQL()
     if action is SpinWheelAction.Add:
         MYSQL.execute(
-            user_query="INSER T INTO spin_wheel "
+            user_query="INSERT INTO spin_wheel "
                        "(`game`, `status`, `url`, `comment`, `server_id`) "
                        "VALUES (%s,%s,%s,%s,%s)",
             values=(
