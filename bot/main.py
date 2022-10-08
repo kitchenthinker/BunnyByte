@@ -319,6 +319,8 @@ def discord_bot():
             # TODO: Checking UpcomingStream
             notification_time = yt_settings['notification_time']['value']
             stream_is_about_to_start = (yt_stream.upcoming_date - utc_time_now()).seconds < notification_time * 60
+            logger.info(f"{stream_is_about_to_start=}, {yt_stream.upcoming_date=}, utc=:{utc_time_now()}, "
+                        f"notification time:{notification_time * 60}, delta=:{(yt_stream.upcoming_date - utc_time_now()).seconds/60}")
             if stream_is_about_to_start:
                 # TODO: Change Video Status to NOTIFIED
                 video_info, emb, view_ = yt_stream.get_discord_video_card()
