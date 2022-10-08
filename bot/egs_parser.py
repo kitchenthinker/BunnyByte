@@ -1,7 +1,6 @@
 import requests
 import datetime
-import discord
-from discord import ButtonStyle
+from discord import ButtonStyle, Embed, Colour
 from discord.ui import Button, View
 from typing import List
 
@@ -11,7 +10,7 @@ EPICLOGO_IMG = "https://cdn.icon-icons.com/icons2/2428/PNG/128/epic_games_black_
 class EGSGame:
 
     def __init__(self, **game_info):
-        self.id = game_info.get('id')
+        self.id = game_info.get('game_id')
         self.title = game_info.get('title')
         self.description = game_info.get('description')
         self.url = game_info.get('url')
@@ -20,7 +19,7 @@ class EGSGame:
 
     def get_game_info(self):
         return {
-            "id": self.id,
+            "game_id": self.id,
             "title": self.title,
             "description": self.description,
             "url": self.url,
@@ -30,17 +29,16 @@ class EGSGame:
 
     def get_discord_game_card(self):
         game_card_info = self.get_game_info()
-        embed_card = discord.Embed(title=self.title,
-                                   url=self.url,
-                                   description=self.description,
-                                   # timestamp=video_info['publish_date'],
-                                   colour=discord.Colour.purple())
+        embed_card = Embed(title=self.title,
+                           url=self.url,
+                           description=self.description,
+                           # timestamp=video_info['publish_date'],
+                           colour=Colour.purple())
 
         embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!")
         embed_card.set_image(url=self.thumbnail)
         # thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
         embed_card.set_thumbnail(url=EPICLOGO_IMG)
-        # url="https://hi825v5k4m5zy0tvn2xkkpoj7wr51i.ext-twitch.tv/hi825v5k4m5zy0tvn2xkkpoj7wr51i/1.0.1/f7d413efc3b9ca91b682d443ae8e46e6/img/heart_1000a.gif")
         # embed_card.set_thumbnail(url="attachment://epic_logo.png")
         embed_card.add_field(name="Спеши до:", value=datetime.datetime.strftime(self.exp_date, "%d.%m.%y %H:%M"))
         game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕", style=ButtonStyle.red, url=self.url)
@@ -90,7 +88,7 @@ class EGSGamesParser:
                     # r_date = parser.isoparse(str_date)
                     exp_date = datetime.datetime.strptime(str_date, "%Y-%m-%dT%H:%M:%S.%fZ")
                     fg_item = {
-                        "id": fg['id'],
+                        "game_id": fg['id'],
                         "title": title,
                         "description": description[0],
                         "url": f'{self.fp_url}{url}',

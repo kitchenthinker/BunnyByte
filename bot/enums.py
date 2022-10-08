@@ -1,11 +1,14 @@
 from enum import Enum, auto
 
 
-class ChecksBeforeStart(Enum):
+class StartChecks(Enum):
     OWNER = auto()
     REGISTRATION = auto()
-    CHANNEL = auto()
+    CHANNEL_EXIST = auto()
+    CHANNEL_AVAILABLE = auto()
+    CHANNEL_TEXT = auto()
     READY = auto()
+    ALREADY_REGISTERED = auto()
 
 
 class SettingSwitcher(Enum):
@@ -21,4 +24,3 @@ class SettingYesNo(Enum):
 class ServerStatus(Enum):
     REGISTERED = 1
     UNREGISTERED = 0
-

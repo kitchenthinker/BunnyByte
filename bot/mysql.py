@@ -4,6 +4,13 @@ import pymysql.cursors
 
 
 class MYSQL:
+    _instance = None  # Keep instance reference
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self):
         self.connection = pymysql.connect(host=config.mSQL_H,
                                           user=config.mSQL_L,
@@ -35,12 +42,14 @@ class MYSQL:
         self.empty = self.rowcount == 0
 
     def execute(self, user_query: str, values=None, commit=False, close_connection: bool = False):
+        self.refresh()
         cursor = self.cursor
         cursor.execute(user_query, values)
         if commit:
             self.commit(close_connection)
 
     def executemany(self, user_query: str, values=None, commit=False, close_connection: bool = False):
+        self.refresh()
         cursor = self.cursor
         cursor.executemany(user_query, values)
         if commit:
