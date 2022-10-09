@@ -1,5 +1,10 @@
 from enum import Enum
+
+import discord
 from discord.app_commands import Choice
+from typing import List
+from discord.ui import Button, View
+from discord import Embed, Guild, ButtonStyle, Interaction
 
 
 # region SPINWHEEL
@@ -44,6 +49,111 @@ class SpinWheelAction(Enum):
     Add = 0,
     Edit = 1,
     Delete = 2
+
+
+class Paginator:
+    slice_number = 6
+
+    def __init__(self, guild: Guild, game_list_: List, info: dict,
+                 defer_: bool = True, admin_call: bool = False, table_view: bool = False):
+
+        self.guild = guild
+        self.game_list = game_list_
+        self.info = info
+        self.defer = defer_
+        self.is_admin = admin_call
+        self.table_view = table_view
+
+        self.emb_list: List[Embed] = []
+        self.index = 0
+        self.max_index = len(self.game_list) - 1
+        self.pages_count = 1
+        self.current_emb: Embed | None = None
+        self.view: CustomView | None = None
+        self.generate_embeds()
+
+    def add_align_field(self, embed: Embed):
+        if self.table_view:
+            if len(embed.fields) > 3:
+                while len(embed.fields) % 3 != 0:
+                    embed.add_field(name=f"#", value=f"#", inline=True)
+
+    def generate_embeds(self):
+
+        def add_field_to_emb(emb_group: Embed, game):
+            value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
+            if self.is_admin:
+                value_ += f"\n💬:\n{game['comment']}"
+            emb_group.add_field(name=f"🕹️ {game['game']}", value=f"{value_}\n\n", inline=bool(self.table_view))
+
+        pages_count = (len(self.game_list) // Paginator.slice_number)
+        self.pages_count = pages_count + 1 if (len(self.game_list) % Paginator.slice_number) != 0 else pages_count
+
+        game_slices = [self.game_list[i:i + Paginator.slice_number]
+                       for i in range(0, self.max_index, Paginator.slice_number)]
+
+        for game_slice in game_slices:
+            embed = Embed(title=f"{self.info['emoji']} {self.info['name']}",
+                          description=self.info['description'])
+            embed.set_footer(text=f"Page {self.index + 1}/{self.pages_count}")
+
+            for game_ in game_slice:
+                add_field_to_emb(embed, game_)
+            if self.table_view:
+                self.add_align_field(embed)
+            self.emb_list.append(embed)
+        self.view = CustomView(_paginator=self, defer=self.defer)
+        if pages_count < 2:
+            self.view.clear_items()
+        self.set_current_emb()
+
+    def set_current_emb(self):
+        self.current_emb = self.emb_list[self.index]
+
+    def index_reach_edge(self):
+        if any([self.index < 0, self.index > self.pages_count - 1]):
+            self.index = 0
+
+    def next(self):
+        return self.get_current_item(step=1)
+
+    def prev(self):
+        return self.get_current_item(step=-1)
+
+    def get_current_item(self, step: int = 0):
+        self.index += step
+        self.index_reach_edge()
+        self.set_current_emb()
+        self.current_emb.set_footer(text=f"Page {self.index + 1}/{self.pages_count}")
+        return self.emb_list[self.index]
+
+    # When the confirm button is pressed, set the inner value to `True` and
+    # stop the View from listening to more input.
+    # We also send the user an ephemeral message that we're confirming their choice.
+
+
+class CustomView(View):
+
+    def __init__(self, _paginator: Paginator, defer: bool = True):
+        super().__init__()
+        self.value = None
+        self.defer = defer
+        self.paginator: Paginator = _paginator
+
+    @discord.ui.button(label='Page', style=ButtonStyle.red, emoji='⏮')
+    async def page_previous(self, interaction: Interaction, button: Button):
+        await interaction.response.defer(ephemeral=self.defer)
+        await interaction.edit_original_response(embed=self.paginator.prev())  # ephemeral=True)
+        # self.value = False
+        # self.stop()
+
+    # This one is similar to the confirmation button except sets the inner value to `False`
+    @discord.ui.button(label='Page', style=ButtonStyle.green, emoji='⏭')
+    async def page_next(self, interaction: Interaction, button: Button):
+        await interaction.response.defer(ephemeral=self.defer)
+        await interaction.edit_original_response(embed=self.paginator.next())  # ephemeral=True)
+        # self.value = False
+        # self.stop()
 
 
 # endregion

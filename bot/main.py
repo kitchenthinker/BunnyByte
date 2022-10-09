@@ -101,10 +101,23 @@ def discord_bot():
             elif isinstance(msg, discord.Interaction):
                 await msg.delete_original_response()
 
-    async def embed_output_server_message(ctx: discord.Interaction, msg: str, delete_after: bool = False):
-        emb = discord.Embed(title="Message from BunnyByte", description=msg)
-        emb.set_thumbnail(url=bot.user.avatar)
-        await ctx.edit_original_response(embed=emb)
+    async def embed_output_server_message(ctx: discord.Interaction, msg: str = None, delete_after: bool = False,
+                                          embed_: discord.Embed | List[discord.Embed] = None,
+                                          view_: discord.ui.View = None):
+        embed_list = list()
+        if msg is not None:
+            emb = discord.Embed(title="Message from BunnyByte", description=msg)
+            emb.set_thumbnail(url=bot.user.avatar)
+            embed_list.append(emb)
+        if embed_ is not None:
+            if isinstance(embed_, list):
+                for e in embed_:
+                    embed_list.append(e)
+            else:
+                embed_list.append(embed_)
+        if not embed_list:
+            embed_list.append(discord.Embed(title="Message from BunnyByte", description="Message is empty"))
+        await ctx.edit_original_response(embeds=embed_list, view=view_)
         if delete_after:
             await discord_delete_message(ctx)
 
@@ -256,8 +269,7 @@ def discord_bot():
         else:
             emb.add_field(name="-----[SERVER]-----", value=helpers.FAQ_ADMIN, inline=False)
         emb.set_thumbnail(url=bot.user.avatar)
-        await ctx.edit_original_response(embed=emb)
-        await discord_delete_message(ctx, 30)
+        await embed_output_server_message(ctx, embed_=emb)
 
         # LOOPS
         # region PARSER_YOUTUBE
@@ -407,9 +419,9 @@ def discord_bot():
         stream = BOT_CONFIG[server.id]['match_ytube'][video]
         stream['greeting'] = description
         db_requests.ytube_update_upcoming_stream_greeting(server.id, video, description)
-        await interaction.edit_original_response(content=f"Your greeting has been changed:\n"
-                                                         f"Stream: **{stream['title']}**\n"
-                                                         f"Greetings: **{description}**")
+        await embed_output_server_message(interaction, msg=f"Your greeting has been changed:\n"
+                                                           f"Stream: **{stream['title']}**\n"
+                                                           f"Greetings: **{description}**")
 
     # endregion
 
@@ -546,7 +558,7 @@ def discord_bot():
 
         game_ = BOT_CONFIG[server.id]['spin_wheel'].get(game)
         if game_ is None:
-            await interaction.edit_original_response(content=f'I don\'t have this game in db {game}')
+            await embed_output_server_message(interaction, msg=f'I don\'t have this game in db {game}')
             return
 
         status = game_['status'] if status is SpinWheelGameStatusEdit.Previous else status
@@ -556,7 +568,7 @@ def discord_bot():
 
         await spinwheel_save_to_db(server, {"game": game, "new_game": name, "status": status, "url": playlist,
                                             "comment": comment}, SpinWheelAction.Edit)
-        await interaction.edit_original_response(content=f'Your game has been changed **{game}**')
+        await embed_output_server_message(interaction, msg=f'Your game has been changed **{game}**')
 
     @commands_group_spinwheel.command(name="delete", description="Delete a game from Spin Wheel.", extras=DEFER_YES)
     @app_commands.autocomplete(game=wheel_games_autocomplete)
@@ -570,10 +582,10 @@ def discord_bot():
 
         game_ = BOT_CONFIG[server.id]['spin_wheel'].get(game)
         if game_ is None:
-            await interaction.edit_original_response(content=f'I don\'t have this game in db {game}')
+            await embed_output_server_message(interaction, msg=f'I don\'t have this game in db {game}')
             return
         await spinwheel_save_to_db(server, {"game": game, "status": None, "url": None}, SpinWheelAction.Delete)
-        await interaction.edit_original_response(content=f'Your has been deleted **{game}**')
+        await embed_output_server_message(interaction, msg=f'Your has been deleted **{game}**')
 
     @commands_group_spinwheel.command(name="choice", description="Choice a game for playing.")
     @discord_async_try_except_decorator
@@ -587,7 +599,7 @@ def discord_bot():
                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
                      if item['status'] is SpinWheelGameStatus.InList]
         if not game_list:
-            await interaction.edit_original_response(content=f'The Game List is empty.')
+            await embed_output_server_message(interaction, f'The Game List is empty.')
             return
         game_ = random.choice(game_list)
         await spinwheel_save_to_db(server, {"game": game_['game'], "new_game": game_['game'],
@@ -651,16 +663,16 @@ def discord_bot():
         else:
             await spinwheel_show(interaction, descript=descript, search=search, list_view=list_view.value)
 
-    @commands_group_spinwheel.command(name="show", description="Show Spin the Wheel.")
+    @commands_group_spinwheel.command(name="show", description="Show Spin the Wheel.", extras=DEFER_YES)
     @app_commands.describe(descript="Show Spin Wheel List Rules.",
                            search="Searching query",
                            category_filter="Show up category filter",
-                           defer="Message is Visible only for you.",
+                           # defer="Message is Visible only for you.",
                            list_view="Table View")
     @discord_async_try_except_decorator
     async def spinwheel_show_wheel(interaction: discord.Interaction,
                                    descript: SettingYesNo = SettingYesNo.No,
-                                   defer: bool = True,
+                                   # defer: bool = True,
                                    category_filter: SettingYesNo = SettingYesNo.No,
                                    search: app_commands.Range[str, 3] = None,
                                    list_view: SettingYesNo = SettingYesNo.No):
@@ -671,62 +683,51 @@ def discord_bot():
         if category_filter is SettingYesNo.Yes:
             # await interaction.response.defer(ephemeral=defer)
             BOT_CONFIG[server.id]['category_filter'] = {
-                interaction.user.id: {"descript": descript, "search": search, "defer": defer,
+                interaction.user.id: {"descript": descript, "search": search, "defer": True,
                                       "list_view": list_view.value}}
             await interaction.edit_original_response(view=CategoryFilter())
         else:
-            await spinwheel_show(interaction, descript=descript, search=search, defer=defer,
-                                 list_view=list_view.value)
+            await spinwheel_show(interaction, descript=descript, search=search, list_view=list_view.value)
 
     async def spinwheel_show(interaction: discord.Interaction, **kwargs):
         server = interaction.guild
-
         list_view = bool(kwargs.get('list_view', 0))
         search = kwargs.get('search', None)
         filter_category = kwargs.get('filter', [e.value for e in SpinWheelGameStatus])
+        is_admin = interaction.user.guild_permissions.administrator
         if isinstance(filter_category, str):
             filter_category = [int(char) for char in filter_category]
         filter_category.sort()
 
-        category_list = {
-            item['value']: discord.Embed(title=f"{item['emoji']} {item['name']}", description=item['description'])
-            for item in game_status_list
-            if item['value'] in filter_category}
+        embeds_dict = {item['value']: {"info": item, "game_list": [], } for item in game_status_list if
+                       item['value'] in filter_category}
 
-        games_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
-                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
-                      if item['status'].value in category_list
-                      and (True if search is None else game.lower().find(search.lower()) != -1)]
+        games_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']} for
+                      game, item in BOT_CONFIG[server.id]['spin_wheel'].items() if
+                      item['status'].value in filter_category and (
+                          True if search is None else game.lower().find(search.lower()) != -1)]
 
         if not games_list:
-            await interaction.edit_original_response(content=f'The Games List is empty.', view=None)
+            await embed_output_server_message(interaction, f'The Game List is empty.')
             return
 
-        descript = kwargs.get('descript')
-        description_ = SPINWHEEL_RULES if descript is SettingYesNo.Yes else ''
-        emb = discord.Embed(title="Рулетка Уразайки-Поиграйки!", description=description_)
-        emb.set_thumbnail(url='http://samyukthascans.com/images/icon/spin.gif')
-
-        def add_field_to_emb(emb_group: discord.Embed, game):
-            value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
-            if interaction.user.guild_permissions.administrator:
-                value_ += f"\n💬 Comment:\n{game['comment']}"
-            emb_group.add_field(name=f"🕹️ {game['game']}", value=f"{value_}\n\n", inline=list_view)
-
         for game in games_list:
-            add_field_to_emb(category_list[game['status'].value], game)
+            embeds_dict[game['status'].value]['game_list'].append(game)
 
-        embeds_list = [emb_item for emb_item in category_list.values()]
-        # add empty fields
-        if list_view:
-            for e in embeds_list:
-                if len(e.fields) > 3:
-                    while len(e.fields) % 3 != 0:
-                        e.add_field(name=f"#", value=f"#", inline=True)
-        if descript is SettingYesNo.Yes:
-            embeds_list.insert(0, emb)
+        messages = [Paginator(server, emb['game_list'], emb['info'], True, is_admin, list_view, ) for emb in
+                    embeds_dict.values()]
+
         await asyncio.sleep(1)
-        await interaction.edit_original_response(embeds=embeds_list, view=None)
+
+        descript = kwargs.get('descript')
+        if descript is SettingYesNo.Yes:
+            description_ = SPINWHEEL_RULES if descript is SettingYesNo.Yes else ''
+            emb = discord.Embed(title="Рулетка Уразайки-Поиграйки!", description=description_)
+            emb.set_thumbnail(url='http://samyukthascans.com/images/icon/spin.gif')
+            await interaction.edit_original_response(embed=emb, view=None)
+
+        for message in messages:
+            await interaction.followup.send(embed=message.current_emb, view=message.view, ephemeral=True)
 
         # endregion
 
@@ -746,25 +747,7 @@ def discord_bot():
             await ctx.response.send_message(embed=discord.Embed(
                 title="Wow, slow down, mate", description=f"Take your time, mate! {str(error)}"), ephemeral=True)
 
-    # @bot.tree.command(name="test_yt", extras=DEFER_YES)
-    # @discord_async_try_except_decorator
-    # async def test_yt(ctx: discord.Interaction, channel: discord.TextChannel, url: str):
-    #
-    #     server = ctx.guild
-    #     # if not await passed_checks_before_start_command(
-    #     #         server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
-    #
-    #     v = await YTLiveStreamParser(channel_url=url).get_last_livestream()
-    #     has_perm = channel.permissions_for(channel.guild.me).send_messages
-    #     emb = discord.Embed(title="Has permission.",
-    #                         description=f"Bot has permission for channel {channel.name}: {has_perm}")
-    #     title = None if v is None else v.title
-    #     date_at = None if v is None else v.upcoming_date
-    #     await ctx.edit_original_response(
-    #         content=f"Title, Live,Upcoming, Date:[{title=}, {v.livestream=}, {v.upcoming=}, {date_at}]", embed=emb)
-
     # region SC_SERVER
-    # TODO - SERVER-INFO FINISHED
     @commands_group_server.command(name="info", description="Show SERVER info.", extras=DEFER_YES)
     @discord_async_try_except_decorator
     async def server_info(ctx: discord.Interaction):
@@ -841,7 +824,6 @@ def discord_bot():
                 server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
             return
 
-        # TODO: Make embed output to user.
         if confirm is SettingYesNo.No:
             await embed_output_server_message(ctx, "Command has been canceled.")
             return
@@ -857,16 +839,17 @@ def discord_bot():
         if password == '!Space@Monkey#':
             local_flush_server_settings(ctx.guild)
             await bot_load_settings(ctx.guild)
-            await ctx.edit_original_response(content="Done")
+            await embed_output_server_message(ctx, msg="Done")
         else:
-            await ctx.edit_original_response(content="Never guess 😜")
+            await embed_output_server_message(ctx, msg="Never guess 😜")
 
     # endregion
 
     async def bot_say_hi_to_registered_server(server: discord.Guild, bot_channel_id):
         if bot.is_ready() and local_get_status(server.id) is ServerStatus.REGISTERED and bot_channel_id is not None:
             try:
-                if not BOT_CONFIG[server.id]['ready']: return
+                if not BOT_CONFIG[server.id]['ready']:
+                    return
                 bot_channel = bot.get_channel(bot_channel_id)
                 if bot_channel is None:
                     owner = server.owner
@@ -1019,6 +1002,8 @@ def discord_bot():
     @bot.event
     async def on_guild_remove(server: discord.Guild):
         if server.id in BOT_CONFIG:
+            await task_ytube_stop(server)
+            await task_egsgames_stop(server)
             db_requests.server_delete_bot_registration(server.id)
             del BOT_CONFIG[server.id]
 
@@ -1048,7 +1033,6 @@ def discord_bot():
             'match_egs': db_requests.server_get_matching_egs_list(server.id),
             'spin_wheel': db_requests.server_get_spinwheel_list(server.id),
         }
-
 
     bot.run(token=config.BUNNYBYTE_TOKEN)
 
