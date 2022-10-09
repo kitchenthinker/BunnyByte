@@ -101,6 +101,8 @@ class YTLiveStreamParser:
                         temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
                             seconds=int(timestamp))
                     current_livestream = temp_livestream
+                else: 
+                    current_livestream = None
         self.current_livestream = current_livestream
         return current_livestream
 

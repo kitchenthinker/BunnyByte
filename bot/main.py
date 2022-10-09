@@ -998,11 +998,23 @@ def discord_bot():
                     await bot_channel.send(content=task_message)
 
     @bot.event
+    async def on_guild_join(server: discord.Guild):
+        await bot_setting_before_launch()
+
+    @bot.event
+    async def on_guild_remove(server: discord.Guild):
+        db_requests.server_delete_bot_registration(server.id)
+        del BOT_CONFIG[server.id]
+
+    @bot.event
     async def on_ready():
         await bot_setting_before_launch()
 
     async def bot_load_settings(server):
         # local_flush_server_settings(server.id)
+        if server.id in BOT_CONFIG:
+            logger.info(f'Settings have been loaded already for [{server.name}, {server.id}]')
+            return
         bot_channel, bot_ready = db_requests.server_get_bot_settings(server.id)
         BOT_CONFIG[server.id] = {
             'id': server.id,
