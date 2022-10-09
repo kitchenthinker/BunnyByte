@@ -964,13 +964,13 @@ def discord_bot():
             await task_egs_restart(server, bot_channel)
 
     @tasks.loop(hours=3)
-    async def delete_old_data(server: discord.Guild):
-        logger.info(f"Starting task 'Delete obsolete data' on {server.name}")
+    async def delete_old_data():
+        logger.info(f"Starting task 'Delete obsolete data' on DataBase")
         MYSQL = mysql.MYSQL()
         MYSQL.execute("DELETE FROM egs_games WHERE CONVERT_TZ(NOW(), 'System', 'GMT') > exp_date")
         MYSQL.execute("DELETE FROM yt_videos WHERE `status` = %s", values=YoutubeStreamStatus.FINISHED.value)
         MYSQL.commit(True)
-        logger.info(f"Old data have been deleted on {server.name}")
+        logger.info(f"Old data have been deleted on DataBase")
 
     @bot.event
     async def on_guild_channel_delete(deleted_channel):
@@ -999,16 +999,37 @@ def discord_bot():
 
     @bot.event
     async def on_guild_join(server: discord.Guild):
-        await bot_setting_before_launch()
+        await bot.tree.sync()
+        await prepare_guild(server)
+
+    async def prepare_guild(server: discord.Guild):
+        if server.id not in BOT_CONFIG:
+            for group in [commands_group_ytube, commands_group_egs, commands_group_spinwheel,
+                          commands_group_server, commands_allowed_to_user]:
+                bot.tree.add_command(group, guild=server)
+            await asyncio.sleep(1)
+            await bot.tree.sync(guild=server)
+            await bot_load_settings(server)
+            if (bot_channel := BOT_CONFIG[server.id]['bot_channel']) is not None:
+                await bot_say_hi_to_registered_server(server, bot_channel)
+            # Check LOOPS here
+            await run_services_task(server)
+            logger.info(f"Server:[{server.name}]:[{server.id}]")
 
     @bot.event
     async def on_guild_remove(server: discord.Guild):
-        db_requests.server_delete_bot_registration(server.id)
-        del BOT_CONFIG[server.id]
+        if server.id in BOT_CONFIG:
+            db_requests.server_delete_bot_registration(server.id)
+            del BOT_CONFIG[server.id]
 
     @bot.event
     async def on_ready():
-        await bot_setting_before_launch()
+        await bot.wait_until_ready()
+        logger.info(f"Logged in as {bot.user.name}({bot.user.id})")
+        await bot.tree.sync()
+        for server in bot.guilds:
+            await prepare_guild(server)
+        await delete_old_data.start()
 
     async def bot_load_settings(server):
         # local_flush_server_settings(server.id)
@@ -1028,23 +1049,6 @@ def discord_bot():
             'spin_wheel': db_requests.server_get_spinwheel_list(server.id),
         }
 
-    async def bot_setting_before_launch():
-        await bot.wait_until_ready()
-        await bot.tree.sync()
-        logger.info(f"Logged in as {bot.user.name}({bot.user.id})")
-        for group in [commands_group_ytube, commands_group_egs, commands_group_spinwheel,
-                      commands_group_server, commands_allowed_to_user]:
-            bot.tree.add_command(group, guilds=bot.guilds)
-        for server in bot.guilds:
-            await asyncio.sleep(1)
-            await bot.tree.sync(guild=server)
-            await bot_load_settings(server)
-            if (bot_channel := BOT_CONFIG[server.id]['bot_channel']) is not None:
-                await bot_say_hi_to_registered_server(server, bot_channel)
-            # Check LOOPS here
-            await run_services_task(server)
-            logger.info(f"Server:[{server.name}]:[{server.id}]")
-            await delete_old_data.start(server)
 
     bot.run(token=config.BUNNYBYTE_TOKEN)
 
