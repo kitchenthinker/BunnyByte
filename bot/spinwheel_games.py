@@ -17,18 +17,18 @@ class SpinWheelGameStatus(Enum):
 
 
 game_status_list = [
-    {"name": "1. Рулетке.", "value": SpinWheelGameStatus.InList.value, "emoji": "🎡",
-     "description": "Список игр, вошедших в рулетку."},
+    {"name": "1. В Рулетке.", "value": SpinWheelGameStatus.InList.value, "emoji": "🎡",
+     "description": "Список игр, вошедших в рулетку.", "show_pl": False},
     {"name": "2. Проходим.", "value": SpinWheelGameStatus.InProgress.value, "emoji": "🎮",
-     "description": "Список игр в процессе прохождения."},
+     "description": "Список игр в процессе прохождения.", "show_pl": True},
     {"name": "3. Закончили.", "value": SpinWheelGameStatus.InFinishedList.value, "emoji": "✅",
-     "description": "Список уже пройденных игр."},
+     "description": "Список уже пройденных игр.", "show_pl": True},
     {"name": "4. Ждем.", "value": SpinWheelGameStatus.InWaitingList.value, "emoji": "😗",
-     "description": "Список предложенных, но ещё не вышедших игр."},
+     "description": "Список предложенных, но ещё не вышедших игр.", "show_pl": False},
     {"name": "5. Баня.", "value": SpinWheelGameStatus.InBanList.value, "emoji": "🥵",
      "description": "Игры из этого списка можно попытаться реабилитировать массовыми уговорами. "
                     "Если очень долго будете пытать УРАЗАЙКУ, возможно, она сдастся. А, возможно, и нет. 😝 "
-                    "Возможно, она даже разозлится, но, как говорится ºкто не рискуетº... Удачи, зайка!"},
+                    "Возможно, она даже разозлится, но, как говорится ºкто не рискуетº... Удачи, зайка!", "show_pl": False},
 ]
 game_status_choices = [
     Choice(name=f"{x['emoji']} {x['name']}", value=x['value'])
@@ -81,7 +81,9 @@ class Paginator:
     def generate_embeds(self):
 
         def add_field_to_emb(emb_group: Embed, game):
-            value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
+            value_ = ""
+            if self.info['show_pl']:
+                value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
             if self.is_admin:
                 value_ += f"\n💬:{game['comment']}"
             emb_group.add_field(name=f"🕹️ {game['game']}", value=f"{value_}\n\n", inline=bool(self.table_view))
