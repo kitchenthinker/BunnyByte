@@ -699,13 +699,14 @@ def discord_bot():
             filter_category = [int(char) for char in filter_category]
         filter_category.sort()
 
-        embeds_dict = {item['value']: {"info": item, "game_list": [], } for item in game_status_list if
-                       item['value'] in filter_category}
-
         games_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']} for
                       game, item in BOT_CONFIG[server.id]['spin_wheel'].items() if
                       item['status'].value in filter_category and (
                           True if search is None else game.lower().find(search.lower()) != -1)]
+
+        filter_category_and_search = set(x['status'].value for x in games_list)
+        embeds_dict = {item['value']: {"info": item, "game_list": [], } for item in game_status_list if
+                       item['value'] in filter_category_and_search}
 
         if not games_list:
             await embed_output_server_message(interaction, f'The Game List is empty.')

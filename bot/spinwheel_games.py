@@ -83,14 +83,14 @@ class Paginator:
         def add_field_to_emb(emb_group: Embed, game):
             value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
             if self.is_admin:
-                value_ += f"\n💬:\n{game['comment']}"
+                value_ += f"\n💬:{game['comment']}"
             emb_group.add_field(name=f"🕹️ {game['game']}", value=f"{value_}\n\n", inline=bool(self.table_view))
 
         pages_count = (len(self.game_list) // Paginator.slice_number)
         self.pages_count = pages_count + 1 if (len(self.game_list) % Paginator.slice_number) != 0 else pages_count
 
         game_slices = [self.game_list[i:i + Paginator.slice_number]
-                       for i in range(0, self.max_index, Paginator.slice_number)]
+                       for i in range(0, self.max_index + 1, Paginator.slice_number)]
 
         for game_slice in game_slices:
             embed = Embed(title=f"{self.info['emoji']} {self.info['name']}",
