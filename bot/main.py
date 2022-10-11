@@ -500,7 +500,8 @@ def discord_bot():
         if local_get_status(server.id) is ServerStatus.UNREGISTERED:
             return []
         games_list = BOT_CONFIG[server.id]['spin_wheel']
-        return [app_commands.Choice(name=game, value=game) for game in games_list if
+        return [app_commands.Choice(name=f"{game_status_dict[item['status']]['emoji']} {game}", value=game)
+                for game, item in games_list.items() if
                 current.lower() in game.lower()][:24]
 
     async def spinwheel_save_to_db(server, values_row: dict, action: SpinWheelAction):
@@ -617,9 +618,9 @@ def discord_bot():
         def __init__(self):
             options = [
                 discord.SelectOption(label=x['name'], value=str(x['value']), emoji=x['emoji'])
-                for x in game_status_list
+                for x in game_status_dict.values()
             ]
-            super().__init__(placeholder="Select an option", max_values=len(game_status_list), min_values=1,
+            super().__init__(placeholder="Select an option", max_values=len(game_status_dict), min_values=1,
                              options=options)
 
         async def callback(self, interaction: discord.Interaction):
@@ -705,7 +706,7 @@ def discord_bot():
                           True if search is None else game.lower().find(search.lower()) != -1)]
 
         filter_category_and_search = set(x['status'].value for x in games_list)
-        embeds_dict = {item['value']: {"info": item, "game_list": [], } for item in game_status_list if
+        embeds_dict = {item['value']: {"info": item, "game_list": [], } for item in game_status_dict.values() if
                        item['value'] in filter_category_and_search}
 
         if not games_list:

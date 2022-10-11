@@ -16,23 +16,23 @@ class SpinWheelGameStatus(Enum):
     InBanList = 4
 
 
-game_status_list = [
-    {"name": "1. В Рулетке.", "value": SpinWheelGameStatus.InList.value, "emoji": "🎡",
+game_status_dict = {
+    SpinWheelGameStatus.InList: {"name": "1. В Рулетке.", "value": SpinWheelGameStatus.InList.value, "emoji": "🎡",
      "description": "Список игр, вошедших в рулетку.", "show_pl": False},
-    {"name": "2. Проходим.", "value": SpinWheelGameStatus.InProgress.value, "emoji": "🎮",
+    SpinWheelGameStatus.InProgress: {"name": "2. Проходим.", "value": SpinWheelGameStatus.InProgress.value, "emoji": "🎮",
      "description": "Список игр в процессе прохождения.", "show_pl": True},
-    {"name": "3. Закончили.", "value": SpinWheelGameStatus.InFinishedList.value, "emoji": "✅",
+    SpinWheelGameStatus.InFinishedList: {"name": "3. Закончили.", "value": SpinWheelGameStatus.InFinishedList.value, "emoji": "✅",
      "description": "Список уже пройденных игр.", "show_pl": True},
-    {"name": "4. Ждем.", "value": SpinWheelGameStatus.InWaitingList.value, "emoji": "😗",
+    SpinWheelGameStatus.InWaitingList: {"name": "4. Ждем.", "value": SpinWheelGameStatus.InWaitingList.value, "emoji": "😗",
      "description": "Список предложенных, но ещё не вышедших игр.", "show_pl": False},
-    {"name": "5. Баня.", "value": SpinWheelGameStatus.InBanList.value, "emoji": "🥵",
+    SpinWheelGameStatus.InBanList: {"name": "5. Баня.", "value": SpinWheelGameStatus.InBanList.value, "emoji": "🥵",
      "description": "Игры из этого списка можно попытаться реабилитировать массовыми уговорами. "
                     "Если очень долго будете пытать УРАЗАЙКУ, возможно, она сдастся. А, возможно, и нет. 😝 "
                     "Возможно, она даже разозлится, но, как говорится ºкто не рискуетº... Удачи, зайка!", "show_pl": False},
-]
+}
 game_status_choices = [
     Choice(name=f"{x['emoji']} {x['name']}", value=x['value'])
-    for x in game_status_list
+    for x in game_status_dict.values()
 ]
 
 
