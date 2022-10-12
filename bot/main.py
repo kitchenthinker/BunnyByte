@@ -182,17 +182,15 @@ def discord_bot():
 
         return True
 
-    async def task_ytube_create(server: discord.Guild, check_hours: int, check_minutes: int,
-                                show_description: SettingYesNo,
+    async def task_ytube_create(server: discord.Guild, check_minutes: int,
                                 notification_time_before: int, yt_channel_url: str,
                                 notification_channel: discord.TextChannel):
 
         ytube = BOT_CONFIG[server.id]['features']['ytube']
         task_to_run: tasks.Loop | None = ytube.get('task')
 
-        full_minutes = check_hours * 60 + check_minutes
         if task_to_run is None:
-            new_task = ytube['task'] = tasks.loop(minutes=full_minutes)(ytube_last_livestream)
+            new_task = ytube['task'] = tasks.loop(minutes=check_minutes)(ytube_last_livestream)
             task_to_run = new_task
         if task_to_run.is_running():
             return False, logger_save_and_return_text(f"YT-Notificator is already running on {server.name}")
@@ -200,14 +198,14 @@ def discord_bot():
 
             ytube = ytube['settings']
             ytube['enable']['value'] = True
-            ytube['repeat']['value'] = full_minutes
+            ytube['repeat']['value'] = check_minutes
             ytube['notification_time']['value'] = notification_time_before
             ytube['yt_channel']['value'] = yt_channel_url
             ytube['channel_id']['value'] = notification_channel.id
-            ytube['show_description']['value'] = bool(show_description.value)
+            ytube['show_description']['value'] = False
 
             db_requests.server_update_settings(server, ytube)
-            task_to_run.start(server, notification_channel, yt_channel_url, show_description.value)
+            task_to_run.start(server, notification_channel, yt_channel_url)
             return True, logger_save_and_return_text(f"YT-Notificator is alive on {server.name}")
 
     async def task_ytube_stop(server: discord.Guild):
@@ -224,11 +222,10 @@ def discord_bot():
         db_requests.server_update_settings(server, ytube['settings'])
         return True, logger_save_and_return_text(f"The loop is shut down on {server.name}")
 
-    async def task_egsgames_create(server: discord.Guild, check_hours: int, check_minutes: int,
-                                   notification_channel: discord.TextChannel):
+    async def task_egsgames_create(server: discord.Guild, check_hours: int, notification_channel: discord.TextChannel):
         egs_service = BOT_CONFIG[server.id]['features']['egs']
         task_to_run: tasks.Loop | None = egs_service.get('task')
-        full_minutes = check_hours * 60 + check_minutes
+        full_minutes = check_hours * 60
         if task_to_run is None:
             new_task = egs_service['task'] = tasks.loop(minutes=full_minutes)(get_games)
             task_to_run = new_task
@@ -277,8 +274,7 @@ def discord_bot():
     def update_match_ytube_list(server: discord.Guild):
         BOT_CONFIG[server.id]['match_ytube'] = db_requests.server_get_matching_ytube_list(server.id)
 
-    async def ytube_last_livestream(server, channel_for_notification: discord.TextChannel,
-                                    yt_channel_url: str, show_description: int = 0):
+    async def ytube_last_livestream(server, channel_for_notification: discord.TextChannel, yt_channel_url: str):
         # TODO: ChecksBeforeStart?
         yt_settings = BOT_CONFIG[server.id]['features']['ytube']['settings']
         server_ready = BOT_CONFIG[server.id]['ready']
@@ -343,27 +339,23 @@ def discord_bot():
         logger.info(f"Got video info: {local_video}")
 
     @commands_group_ytube.command(name="start", description="Enable YouTube Streams Notificator.", extras=DEFER_YES)
-    @app_commands.describe(yt_channel_url="YouTube Channel URL",
+    @app_commands.describe(channel_url="YouTube Channel URL",
                            notification_channel="Discord channel for sending notifications.",
-                           show_description="Show full video description in template. Default = Disable",
-                           notification_time_before="Send upcoming stream notifications before X-time. Default = 3",
-                           check_hours="Check new stream every X hours. Default = 0",
-                           check_minutes="Check new stream every X minutes. Default = 59 | Min = 5")
+                           notification_time_before="Send upcoming stream notifications before X-time. Default = 5",
+                           check_minutes="Check new stream every X minutes. Default = 15 | Min = 5")
     @discord_async_try_except_decorator
     async def ytube_service_start(ctx: discord.Interaction,
                                   notification_channel: discord.TextChannel,
-                                  yt_channel_url: str,
-                                  show_description: SettingYesNo = SettingYesNo.No,
-                                  notification_time_before: app_commands.Range[int, 3] = 3,
-                                  check_hours: app_commands.Range[int, 0] = 0,
-                                  check_minutes: app_commands.Range[int, 5] = 59):
+                                  channel_url: str,
+                                  notification_time_before: app_commands.Range[int, 5] = 10,
+                                  check_minutes: app_commands.Range[int, 5] = 15):
         server = ctx.guild
         if not await passed_checks_before_start_command(
                 server, ctx, notification_channel, checks=[StartChecks.OWNER, StartChecks.REGISTRATION,
                                                            StartChecks.CHANNEL_EXIST,
                                                            StartChecks.CHANNEL_AVAILABLE]): return
-        task_status, task_message = await task_ytube_create(server, check_hours, check_minutes, show_description,
-                                                            notification_time_before, yt_channel_url,
+        task_status, task_message = await task_ytube_create(server, check_minutes,
+                                                            notification_time_before, channel_url,
                                                             notification_channel)
         await embed_output_server_message(ctx, task_message, True)
 
@@ -378,7 +370,7 @@ def discord_bot():
 
     @commands_group_ytube.command(name="restart", description="Restart YouTube Notificator.", extras=DEFER_YES)
     @discord_async_try_except_decorator
-    async def egs_service_restart(ctx: discord.Interaction):
+    async def ytube_service_restart(ctx: discord.Interaction):
         server = ctx.guild
         if not await passed_checks_before_start_command(
                 server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
@@ -448,13 +440,11 @@ def discord_bot():
 
     @commands_group_egs.command(name="start", description="Enable EGS Notificator.", extras=DEFER_YES)
     @app_commands.describe(notification_channel="Channel for sending notifications.",
-                           check_hours="Check new games every X hours. Default = 1",
-                           check_minutes="Check new games every X minutes. Default = 0")
+                           check_hours="Check new games every X hours. Default = 1")
     @discord_async_try_except_decorator
     async def egs_service_start(ctx: discord.Interaction,
                                 notification_channel: discord.TextChannel,
-                                check_hours: app_commands.Range[int, 1] = 1,
-                                check_minutes: app_commands.Range[int, 0] = 0):
+                                check_hours: app_commands.Range[int, 1] = 1):
         server = ctx.guild
         if not await passed_checks_before_start_command(
                 server, ctx, notification_channel,
@@ -462,8 +452,7 @@ def discord_bot():
                         StartChecks.CHANNEL_AVAILABLE]):
             return
 
-        task_status, task_message = await task_egsgames_create(server, check_hours, check_minutes,
-                                                               notification_channel)
+        task_status, task_message = await task_egsgames_create(server, check_hours, notification_channel)
         await embed_output_server_message(ctx, task_message)
 
     @commands_group_egs.command(name="stop", description="Disable EGS Notificator.", extras=DEFER_YES)
@@ -776,8 +765,9 @@ def discord_bot():
     async def server_change_channel(ctx: discord.Interaction, bot_channel: discord.TextChannel):
         server = ctx.guild
         if not await passed_checks_before_start_command(
-                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION, StartChecks.CHANNEL_EXIST,
-                                     StartChecks.CHANNEL_AVAILABLE, ]):
+                server, ctx, bot_channel,
+                checks=[StartChecks.OWNER, StartChecks.REGISTRATION, StartChecks.CHANNEL_EXIST,
+                        StartChecks.CHANNEL_AVAILABLE, ]):
             return
 
         if bot_channel.id == local_get_bot_channel(server.id):
@@ -889,7 +879,7 @@ def discord_bot():
                     return
             BOT_CONFIG[server.id]['match_egs'] = db_requests.server_get_matching_egs_list(server.id)
             task_status, task_message = await task_egsgames_create(
-                server=server, check_hours=0, check_minutes=int(egs_settings['repeat']['value']),
+                server=server, check_hours=int(egs_settings['repeat']['value']),
                 notification_channel=egs_channel)
             if bot_channel is None:
                 return task_status, task_message
@@ -915,8 +905,7 @@ def discord_bot():
                     return
             BOT_CONFIG[server.id]['match_ytube'] = db_requests.server_get_matching_ytube_list(server.id)
             task_status, task_message = await task_ytube_create(
-                server=server, check_hours=0, check_minutes=int(ytube_settings['repeat']['value']),
-                show_description=SettingYesNo(ytube_settings['show_description']['value']),
+                server=server, check_minutes=int(ytube_settings['repeat']['value']),
                 notification_channel=ytube_channel,
                 notification_time_before=ytube_settings['notification_time']['value'],
                 yt_channel_url=ytube_settings['yt_channel']['value'])
