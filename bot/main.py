@@ -6,7 +6,8 @@ import helpers
 import mysql
 import random
 import joke
-from typing import List
+
+from datetime import datetime
 
 from helpers import (
     simple_try_except_decorator,
@@ -225,16 +226,15 @@ def discord_bot():
     async def task_egsgames_create(server: discord.Guild, check_hours: int, notification_channel: discord.TextChannel):
         egs_service = BOT_CONFIG[server.id]['features']['egs']
         task_to_run: tasks.Loop | None = egs_service.get('task')
-        full_minutes = check_hours * 60
         if task_to_run is None:
-            new_task = egs_service['task'] = tasks.loop(minutes=full_minutes)(get_games)
+            new_task = egs_service['task'] = tasks.loop(hours=check_hours)(get_games)
             task_to_run = new_task
         if task_to_run.is_running():
             return False, logger_save_and_return_text(f"EGS-Notificator is already running on {server.name}")
         else:
             egs_service = egs_service['settings']
             egs_service['enable']['value'] = True
-            egs_service['repeat']['value'] = full_minutes
+            egs_service['repeat']['value'] = check_hours
             egs_service['channel_id']['value'] = notification_channel.id
             db_requests.server_update_settings(server, egs_service)
             task_to_run.start(server, notification_channel)
@@ -749,11 +749,26 @@ def discord_bot():
 
         bot_channel = bot.get_channel(local_get_bot_channel(server.id))
         bot_channel_name = None if bot_channel is None else bot_channel.name
+
+        egs_info = "Not found"
+        ytube_info = "Not found"
+
+        if local_get_status(server.id) is ServerStatus.REGISTERED:
+            egs_task = BOT_CONFIG[server.id]['features']['egs']['task']
+            ytube_task = BOT_CONFIG[server.id]['features']['ytube']['task']
+            if egs_task is not None:
+                egs_info = f"Task has been found: Next launch (GMT): " \
+                           f"{datetime.strftime(egs_task.next_iteration, '%d.%m.%y %H:%M')}"
+            if ytube_task is not None:
+                ytube_info = f"Task has been found: Next launch (GMT): " \
+                           f"{datetime.strftime(ytube_task.next_iteration, '%d.%m.%y %H:%M')}"
         emb = discord.Embed(title="SERVER-INFO", )
         emb.add_field(name="Name", value=f"[**{ctx.guild.name}**]")
         emb.add_field(name="ID", value=f"[**{ctx.guild.id}**]")
-        emb.add_field(name="Status", value=f"[**{BOT_CONFIG[server.id]['status'].name}**]")
+        emb.add_field(name="Status", value=f"[**{BOT_CONFIG[server.id]['status'].name}**]", inline=False)
         emb.add_field(name="Service channel", value=f"[**{bot_channel_name}**]")
+        emb.add_field(name="EGS-notificator", value=f"[**{egs_info}**]", inline=False)
+        emb.add_field(name="YouTube-notificator", value=f"[**{ytube_info}**]", inline=False)
         emb.set_thumbnail(url=bot.user.avatar)
         await ctx.edit_original_response(embed=emb)
 
