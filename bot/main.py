@@ -326,9 +326,10 @@ def discord_bot():
         elif local_video['status'] is YoutubeStreamStatus.UPCOMING:
             # TODO: Checking UpcomingStream
             notification_time = yt_settings['notification_time']['value']
-            stream_is_about_to_start = (yt_stream.upcoming_date - utc_time_now()).seconds < notification_time * 60
+            t_delta = (yt_stream.upcoming_date - utc_time_now()).total_seconds()
+            stream_is_about_to_start = t_delta < notification_time * 60
             logger.info(f"{stream_is_about_to_start=}, {yt_stream.upcoming_date=}, utc=:{utc_time_now()}, "
-                        f"notification time:{notification_time * 60}, delta=:{(yt_stream.upcoming_date - utc_time_now()).seconds / 60}")
+                        f"notification time:{notification_time * 60}, delta=:{t_delta / 60}")
             if stream_is_about_to_start:
                 # TODO: Change Video Status to NOTIFIED
                 video_info, emb, view_ = yt_stream.get_discord_video_card()
