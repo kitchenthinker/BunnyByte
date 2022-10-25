@@ -555,7 +555,7 @@ def discord_bot():
             await embed_output_server_message(interaction, msg=f'I don\'t have this game in db {game}')
             return
 
-        status = game_['status'] if status is SpinWheelGameStatusEdit.Previous else status
+        status = game_['status'] if status is SpinWheelGameStatusEdit.Previous else SpinWheelGameStatus(status.value)
         playlist = game_['url'] if playlist is None else playlist
         comment = "" if comment == "!" else (game_['comment'] if comment is None else comment)
         name = game if name is None else name
