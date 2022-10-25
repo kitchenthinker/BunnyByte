@@ -392,7 +392,10 @@ def discord_bot():
 
         def return_stream_name(item):
             time_left = item['upcoming_date'] - utc_time_now()
-            return f"{item['title']} [Time Left: {helpers.strfdelta(tdelta=time_left)}]"
+            title = item['title']
+            if len(title) > 50:
+                title = f"{title[:50]}..."
+            return f"{title} [Time Left: {helpers.strfdelta(tdelta=time_left)}]"
 
         return [app_commands.Choice(name=return_stream_name(video), value=video['video_id'])
                 for video in video_list.values()
