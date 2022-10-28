@@ -76,7 +76,7 @@ class EGSGamesParser:
         data = self.get_games_data_from_api()
         if data is not None:
             free_games_list = [x for x in data['data']['Catalog']['searchStore']['elements'] if
-                               x['promotions'] is not None]
+                               x['promotions'] is not None and x['price']['totalPrice']['discountPrice'] == 0]
 
             for fg in free_games_list:
                 if fg['promotions']['promotionalOffers'].__len__() > 0:
