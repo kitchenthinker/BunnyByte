@@ -77,7 +77,8 @@ def discord_bot():
     intents.message_content = True
     intents.members = True
     intents.guilds = True
-    bot = commands.Bot(command_prefix='.', intents=intents, help_command=None)
+    allowed_mentions = discord.AllowedMentions(everyone=True)
+    bot = commands.Bot(command_prefix='.', intents=intents, help_command=None, allowed_mentions=allowed_mentions)
 
     commands_group_ytube = app_commands.Group(name="bb_ytube",
                                               description="Commands for interaction with YouTube-Notificator.",
@@ -320,7 +321,7 @@ def discord_bot():
         local_video = server_stream_data[video_id]
         if local_video['status'] is YoutubeStreamStatus.ONLINE:
             video_info, emb, view_ = yt_stream.get_discord_video_card()
-            await channel_for_notification.send(embed=emb, view=view_)
+            await channel_for_notification.send(content="@everyone", embed=emb, view=view_)
             db_requests.ytube_update_stream_status(server.id, video_id, YoutubeStreamStatus.NOTIFIED_ONLINE)
             local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED_ONLINE))
         elif local_video['status'] is YoutubeStreamStatus.UPCOMING:
@@ -333,7 +334,7 @@ def discord_bot():
             if stream_is_about_to_start:
                 # TODO: Change Video Status to NOTIFIED
                 video_info, emb, view_ = yt_stream.get_discord_video_card()
-                await channel_for_notification.send(embed=emb, view=view_)
+                await channel_for_notification.send(content="@everyone", embed=emb, view=view_)
                 db_requests.ytube_update_stream_status(server.id, video_id, YoutubeStreamStatus.NOTIFIED)
                 local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED))
 
@@ -765,7 +766,7 @@ def discord_bot():
                            f"{datetime.strftime(egs_task.next_iteration, '%d.%m.%y %H:%M')}"
             if ytube_task is not None:
                 ytube_info = f"Task has been found: Next launch (GMT): " \
-                           f"{datetime.strftime(ytube_task.next_iteration, '%d.%m.%y %H:%M')}"
+                             f"{datetime.strftime(ytube_task.next_iteration, '%d.%m.%y %H:%M')}"
         emb = discord.Embed(title="SERVER-INFO", )
         emb.add_field(name="Name", value=f"[**{ctx.guild.name}**]")
         emb.add_field(name="ID", value=f"[**{ctx.guild.id}**]")

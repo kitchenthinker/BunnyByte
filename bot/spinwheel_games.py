@@ -100,7 +100,7 @@ class Paginator:
     def generate_embeds(self):
 
         def add_field_to_emb(emb_group: Embed, game):
-            value_ = ""
+            value_ = "\u200b"
             if self.info['show_pl']:
                 value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
             if self.is_admin:
@@ -157,7 +157,7 @@ class CustomView(View):
 
     def __init__(self, _paginator: Paginator, defer: bool = True):
         super().__init__()
-        self.value = None
+        self.value = "\u200b"
         self.defer = defer
         self.paginator: Paginator = _paginator
 
