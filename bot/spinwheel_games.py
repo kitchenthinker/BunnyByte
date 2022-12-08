@@ -124,7 +124,7 @@ class Paginator:
                 self.add_align_field(embed)
             self.emb_list.append(embed)
         self.view = CustomView(_paginator=self, defer=self.defer)
-        if pages_count < 2:
+        if len(self.game_list) <= Paginator.slice_number:
             self.view.clear_items()
         self.set_current_emb()
 
