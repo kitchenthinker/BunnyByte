@@ -24,6 +24,7 @@ from discord.ext import (
 )
 from yt_parser import YTLiveStreamParser, YouTubeLiveStream, YoutubeStreamStatus
 from egs_parser import EGSGamesParser, EGSGame
+from gp_parser import GamerPowerParser, GamerPowerGame
 from enums import *
 from spinwheel_games import *
 
@@ -38,10 +39,10 @@ BOT_CONFIG = {}
 
 
 @simple_try_except_decorator
-def egs_games_save_to_dbase(server, egs_game: EGSGame, game_info: dict):
-    db_requests.egs_save_game_to_db(server.id, egs_game)
-    BOT_CONFIG[server.id]['match_egs'][egs_game.id] = game_info
-    logger.info(f"Game [{egs_game.title}] list has been saved.")
+def egs_games_save_to_dbase(server, free_game: EGSGame | GamerPowerGame, game_info: dict):
+    db_requests.egs_save_game_to_db(server.id, free_game)
+    BOT_CONFIG[server.id]['match_egs'][free_game.id] = game_info
+    logger.info(f"Game [{free_game.title}] list has been saved.")
 
 
 # region LOCAL_BOT
@@ -431,7 +432,8 @@ def discord_bot():
         if not any([egs_settings['enable']['value'], server_ready]):
             logger.info("Bot or channel isn't ready for launching YT-notificator.")
             return
-        egs = EGSGamesParser()
+        # egs = EGSGamesParser()
+        egs = GamerPowerParser()
         if egs.empty:
             return
         local_db = BOT_CONFIG[server.id]['match_egs']

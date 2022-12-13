@@ -4,17 +4,33 @@ from discord import ButtonStyle, Embed, Colour
 from discord.ui import Button, View
 from typing import List
 
-EPICLOGO_IMG = "https://cdn.icon-icons.com/icons2/2428/PNG/128/epic_games_black_logo_icon_147139.png"
+EPIC_LOGO_IMG = r"img\i-epic.png"
+STEAM_LOGO_IMG = r"img\i-steam.png"
+GOG_LOGO_IMG = r"img\i-gog.png"
+EMPTY_LOGO_IMG = r"img\i-empty.png"
 
+market_icons_dict = {
+    "Steam" : STEAM_LOGO_IMG,
+    "Epic Games Store" : EPIC_LOGO_IMG,
+    "GOG": GOG_LOGO_IMG,
+}
 
-class EGSGame:
+def get_market_icon(platforms: str) -> str:
+    for key, value in market_icons_dict.items():
+        if key in platforms:
+            return value
+    return EMPTY_LOGO_IMG
+
+class GamerPowerGame:
 
     def __init__(self, **game_info):
         self.id = game_info.get('game_id')
         self.title = game_info.get('title')
         self.description = game_info.get('description')
+        self.instructions = game_info.get('instructions')
+        self.platforms = game_info.get('platforms')
         self.url = game_info.get('url')
-        self.exp_date = game_info.get('exp_date')
+        self.exp_date = game_info.get('end_date')
         self.thumbnail = game_info.get('thumbnail')
 
     def get_game_info(self):
@@ -22,6 +38,8 @@ class EGSGame:
             "game_id": self.id,
             "title": self.title,
             "description": self.description,
+            "instructions": self.instructions,
+            "platforms": self.platforms,
             "url": self.url,
             "exp_date": self.exp_date,
             "thumbnail": self.thumbnail,
@@ -34,36 +52,38 @@ class EGSGame:
                            description=self.description,
                            # timestamp=video_info['publish_date'],
                            colour=Colour.purple())
-
-        embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!")
+        _icon_url = get_market_icon(self.platforms)
+        embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!", icon_url=_icon_url)
         embed_card.set_image(url=self.thumbnail)
         # thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
-        embed_card.set_thumbnail(url=EPICLOGO_IMG)
+        #embed_card.set_thumbnail(url=EPICLOGO_IMG)
         # embed_card.set_thumbnail(url="attachment://epic_logo.png")
         embed_card.add_field(name="Спеши до:", value=datetime.datetime.strftime(self.exp_date, "%d.%m.%y %H:%M"))
+        embed_card.add_field(name="Как забрать:", value=self.instructions)
+        embed_card.set_footer(text="Thanks gamerpower.com for API")
         game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕", style=ButtonStyle.red, url=self.url)
         dc_view = View()
         dc_view.add_item(game_button)
         return game_card_info, embed_card, dc_view  # , thumbnail_file
 
 
-class EGSGamesParser:
+class GamerPowerParser:
 
     def __init__(self):
-        self.API = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions"
-        self.param = {
-            "locale": "ru-RU",
-            "country": "RU",
-            "allowCountries": "RU",
-
-        }
-        self.fp_url = 'https://store.epicgames.com/p/'
-        self.free_games: List[EGSGame] = []
+        self.API = "https://www.gamerpower.com/api/filter?platform=epic-games-store.steam.gog&type=game"
+        # self.param = {
+        #     "locale": "ru-RU",
+        #     "country": "RU",
+        #     "allowCountries": "RU",
+        #
+        # }
+        #self.fp_url = 'https://store.epicgames.com/p/'
+        self.free_games: List[GamerPowerGame] = []
         self.empty: bool = True
         self.refresh()
 
     def get_games_data_from_api(self):
-        r = requests.get(url=self.API, params=self.param)
+        r = requests.get(url=self.API)
         if r.status_code != 200:
             return None
         return r.json()
@@ -75,25 +95,20 @@ class EGSGamesParser:
     def get_free_games(self):
         data = self.get_games_data_from_api()
         if data is not None:
-            free_games_list = [x for x in data['data']['Catalog']['searchStore']['elements'] if
-                               x['promotions'] is not None and x['price']['totalPrice']['discountPrice'] == 0]
+            free_games_list = [x for x in data if x['status'] == "Active"]
 
             for fg in free_games_list:
-                if fg['promotions']['promotionalOffers'].__len__() > 0:
-                    title = fg['title']
-                    description = fg['description'],
-                    url = fg['catalogNs']['mappings'][0]['pageSlug']
-                    img = [x['url'] for x in fg['keyImages'] if x['type'] == 'OfferImageWide'][0]
-                    str_date = fg['promotions']['promotionalOffers'][0]['promotionalOffers'][0]['endDate']
-                    # r_date = parser.isoparse(str_date)
-                    exp_date = datetime.datetime.strptime(str_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-                    fg_item = {
-                        "game_id": fg['id'],
-                        "title": title,
-                        "description": description[0],
-                        "url": f'{self.fp_url}{url}',
-                        "exp_date": exp_date,
-                        "thumbnail": img,
-                    }
-                    egs_game = EGSGame(**fg_item)
-                    self.free_games.append(egs_game)
+                str_date = fg['end_date'] if fg['end_date'] != 'N/A' else '2099-01-01 00:00:00'
+                exp_date = datetime.datetime.strptime(str_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+                fg_item = {
+                    "game_id": fg['id'],
+                    "title": fg['title'],
+                    "description": fg['description'],
+                    "instructions": fg['instructions'],
+                    "platforms": fg['platforms'],
+                    "url": fg['open_giveaway_url'],
+                    "exp_date": exp_date,
+                    "thumbnail": fg['image'],
+                }
+                gp_game = GamerPowerGame(**fg_item)
+                self.free_games.append(gp_game)
