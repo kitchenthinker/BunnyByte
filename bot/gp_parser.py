@@ -5,10 +5,10 @@ from discord.ui import Button, View
 from typing import List
 from bs4 import BeautifulSoup
 
-EPIC_LOGO_IMG = r"img\i-epic.png"
-STEAM_LOGO_IMG = r"img\i-steam.png"
-GOG_LOGO_IMG = r"img\i-gog.png"
-EMPTY_LOGO_IMG = r"img\i-empty.png"
+EPIC_LOGO_IMG = "https://raw.githubusercontent.com/kitchenthinker/BunnyByte/master/bot/img/i-epic.png"
+STEAM_LOGO_IMG = "https://raw.githubusercontent.com/kitchenthinker/BunnyByte/master/bot/img/i-steam.png"
+GOG_LOGO_IMG = "https://raw.githubusercontent.com/kitchenthinker/BunnyByte/master/bot/img/i-gog.png"
+EMPTY_LOGO_IMG = "https://raw.githubusercontent.com/kitchenthinker/BunnyByte/master/bot/img/i-empty.png"
 
 market_icons_dict = {
     "Steam": STEAM_LOGO_IMG,
@@ -27,6 +27,7 @@ def get_right_instruction(instruction: str) -> str:
             right_instruction += f"[{row.text}]({row.attrs['href']}) "
 
     return right_instruction
+
 
 def get_market_icon(platforms: str) -> str:
     for key, value in market_icons_dict.items():
@@ -66,14 +67,11 @@ class GamerPowerGame:
                            description=self.description,
                            # timestamp=video_info['publish_date'],
                            colour=Colour.purple())
-        # url_icon_url = get_market_icon(self.platforms)
-        thumbnail_file = File(get_market_icon(self.platforms), filename="market_icon.png")
-        embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!",
-                              icon_url="attachment://market_icon.png")
-        embed_card.set_image(url=self.thumbnail)
-        # thumbnail_file = discord.File("./img/epic_logo.png", filename="epic_logo.png")
-        # embed_card.set_thumbnail(url=EPICLOGO_IMG)
+        # thumbnail_file = File(get_market_icon(self.platforms), filename="market_icon.png")
         # embed_card.set_thumbnail(url="attachment://epic_logo.png")
+        url_icon_ = get_market_icon(self.platforms)
+        embed_card.set_author(name="Зайка 🐰! Успей забрать морковку на халяву 🥕!", icon_url=url_icon_)
+        embed_card.set_image(url=self.thumbnail)
         embed_card.add_field(name="Спеши до:", value=datetime.datetime.strftime(self.exp_date, "%d.%m.%y %H:%M"),
                              inline=True)
         instruction = get_right_instruction(self.instructions)
@@ -82,7 +80,7 @@ class GamerPowerGame:
         game_button = Button(label="🥕🥕🥕 Забрать 🥕🥕🥕", style=ButtonStyle.red, url=self.url)
         dc_view = View()
         dc_view.add_item(game_button)
-        return game_card_info, embed_card, dc_view, thumbnail_file
+        return game_card_info, embed_card, dc_view #, thumbnail_file
 
 
 class GamerPowerParser:
