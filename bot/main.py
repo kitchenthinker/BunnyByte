@@ -440,9 +440,9 @@ def discord_bot():
         for egs_game in egs.free_games:
             if egs_game.id not in local_db:
                 logger.info(f"Fetching game info: {egs_game.title}")
-                game_info, emb, view_ = egs_game.get_discord_game_card()
+                game_info, emb, view_, file_ = egs_game.get_discord_game_card()
                 egs_games_save_to_dbase(server, egs_game, game_info)
-                await notification_channel.send(embed=emb, view=view_)
+                await notification_channel.send(embed=emb, view=view_, file=file_)
                 logger.info(f"Got game info: {egs_game.title}")
 
     @commands_group_egs.command(name="start", description="Enable EGS Notificator.", extras=DEFER_YES)
