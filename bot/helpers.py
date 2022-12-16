@@ -87,7 +87,9 @@ def discord_async_try_except_decorator(func):
             if is_discord_interaction:
                 command_extras = {'extras': None} if interaction.command is None else interaction.command.extras
                 defer = kwargs.get('defer', command_extras.get(EPHEMERAL_ATTRIBUTE_NAME, False))
-                await interaction.response.defer(ephemeral=defer)
+                use_decorator_defer = command_extras.get('use_defer', True)
+                if use_decorator_defer:
+                    await interaction.response.defer(ephemeral=defer)
             return await func(interaction, *args, **kwargs)
         except Exception as e:
             if is_discord_interaction:

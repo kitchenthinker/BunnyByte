@@ -610,6 +610,41 @@ def discord_bot():
         emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/7300/7300049.png')
         await interaction.edit_original_response(embed=emb)
 
+    @commands_group_spinwheel.command(name="poll", description="Create a poll.", extras={'use_defer': False})
+    @app_commands.describe(count="How many games do you want to choose? Default = 3", defer="Visible only for you")
+    @discord_async_try_except_decorator
+    async def spinwheel_poll(interaction: discord.Interaction, count: app_commands.Range[int, 1, 5] = 3,
+                             defer: SettingYesNo = SettingYesNo.Yes):
+        server = interaction.guild
+        if not await passed_checks_before_start_command(
+                server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
+
+        game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
+                     for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
+                     if item['status'] is SpinWheelGameStatus.InList]
+        if not game_list:
+            await embed_output_server_message(interaction, f'The Game List is empty.')
+            return
+
+        # await spinwheel_save_to_db(server, {"game": game_['game'], "new_game": game_['game'],
+        #                                     "status": SpinWheelGameStatus.InProgress,
+        #                                     "url": game_["url"], "comment": game_["comment"]}, SpinWheelAction.Edit)
+
+        emb = discord.Embed(
+            title="Уразайка-Поиграйка!"
+        )
+        for _ in range(count):
+            if not game_list:
+                break
+            game_ = random.choice(game_list)
+            emb.add_field(name="Пора играть:", value=f"**{game_['game']}**", inline=False)
+            game_list.remove(game_)
+        #emb.set_footer(text=game_["comment"])
+        emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/7300/7300049.png')
+        await interaction.response.defer(ephemeral=defer.value)
+        await interaction.edit_original_response(embed=emb)
+
     class Select(discord.ui.Select):
         def __init__(self):
             options = [
