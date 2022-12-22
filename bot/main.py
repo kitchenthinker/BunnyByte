@@ -610,7 +610,7 @@ def discord_bot():
         )
         emb.add_field(name="Пора играть:", value=f"**{game_['game']}**", inline=False)
         emb.set_footer(text=game_["comment"])
-        emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/7300/7300049.png')
+        emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/9217/9217857.png')
         await interaction.edit_original_response(embed=emb)
 
     @commands_group_spinwheel.command(name="poll", description="Create a poll.", extras={'use_defer': False})
@@ -635,16 +635,17 @@ def discord_bot():
         #                                     "url": game_["url"], "comment": game_["comment"]}, SpinWheelAction.Edit)
 
         emb = discord.Embed(
-            title="Уразайка-Поиграйка!"
+            title="Уразайка-Поиграйка!",
+            description="Пора выбирать во что играть."
         )
         for _ in range(count):
             if not game_list:
                 break
             game_ = random.choice(game_list)
-            emb.add_field(name="Пора играть:", value=f"**{game_['game']}**", inline=False)
+            emb.add_field(name=f"Вариант {_ + 1}:", value=f"**{game_['game']}**", inline=False)
             game_list.remove(game_)
-        #emb.set_footer(text=game_["comment"])
-        emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/7300/7300049.png')
+        # emb.set_footer(text=game_["comment"])
+        emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/9217/9217844.png')
         await interaction.response.defer(ephemeral=defer.value)
         await interaction.edit_original_response(embed=emb)
 
@@ -1000,7 +1001,9 @@ def discord_bot():
     # region BOT_LOOP_TASKS
     @tasks.loop(hours=1)
     async def bot_task_get_free_games_list():
+        logger.info(f"Starting task 'Get Free Games'")
         BOT_CONFIG.update({"FREE_GAMES": GamerPowerParser().free_games})
+        logger.info(f"End a loop of task 'Get Free Games'")
 
     @tasks.loop(hours=3)
     async def bot_task_delete_old_data():
@@ -1010,6 +1013,7 @@ def discord_bot():
         MYSQL.execute("DELETE FROM yt_videos WHERE `status` = %s", values=YoutubeStreamStatus.FINISHED.value)
         MYSQL.commit(True)
         logger.info(f"Old data have been deleted on DataBase")
+
     # endregion
 
     @bot.event
@@ -1068,11 +1072,17 @@ def discord_bot():
     async def on_ready():
         await bot.wait_until_ready()
         logger.info(f"Logged in as {bot.user.name}({bot.user.id})")
+        logger.info(f"Synchronizing bot tree...")
         await bot.tree.sync()
+        logger.info(f"Synchronizing has been finished.")
+        logger.info(f"Launch bot tasks...")
+        bot_task_get_free_games_list.start()
+        bot_task_delete_old_data.start()
+        logger.info(f"Done.")
+        logger.info(f"Prepare guilds...")
         for server in bot.guilds:
             await prepare_guild(server)
-        await bot_task_get_free_games_list.start()
-        await bot_task_delete_old_data.start()
+        logger.info(f"Done...")
 
     async def bot_load_settings(server):
         # local_flush_server_settings(server.id)

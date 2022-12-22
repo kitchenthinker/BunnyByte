@@ -4,6 +4,7 @@ from discord import ButtonStyle, Embed, Colour, File
 from discord.ui import Button, View
 from typing import List
 from bs4 import BeautifulSoup
+from helpers import logger
 
 EPIC_LOGO_IMG = "https://raw.githubusercontent.com/kitchenthinker/BunnyByte/master/bot/img/i-epic.png"
 STEAM_LOGO_IMG = "https://raw.githubusercontent.com/kitchenthinker/BunnyByte/master/bot/img/i-steam.png"
@@ -99,9 +100,13 @@ class GamerPowerParser:
         self.refresh()
 
     def get_games_data_from_api(self):
+        logger.info("Initializing GamerPower Parser")
+        logger.info("Getting info from GamerPower")
         r = requests.get(url=self.API)
-        if r.status_code != 200:
-            return None
+        if r.status_code != 200:      
+            logger.info("Failure receiving data from GamerPower")
+            return None    
+        logger.info("Success receiving data from GamerPower")
         return r.json()
 
     def refresh(self):
@@ -128,3 +133,4 @@ class GamerPowerParser:
                 }
                 gp_game = GamerPowerGame(**fg_item)
                 self.free_games.append(gp_game)
+                logger.info(f"Game's added {fg['title']} from GamerPower")
