@@ -433,7 +433,8 @@ def discord_bot():
             logger.info("Bot or channel isn't ready for launching YT-notificator.")
             return
         # egs = EGSGamesParser()
-        egs = GamerPowerParser()
+        # egs = GamerPowerParser()
+        egs = BOT_CONFIG.get("FREE_GAMES", [])
         if egs.empty:
             return
         local_db = BOT_CONFIG[server.id]['match_egs']
@@ -994,14 +995,20 @@ def discord_bot():
             await task_ytube_restart(server, bot_channel)
             await task_egs_restart(server, bot_channel)
 
+    # region BOT_LOOP_TASKS
+    @tasks.loop(hours=1)
+    async def bot_task_get_free_games_list():
+        BOT_CONFIG.update({"FREE_GAMES": GamerPowerParser().free_games})
+
     @tasks.loop(hours=3)
-    async def delete_old_data():
+    async def bot_task_delete_old_data():
         logger.info(f"Starting task 'Delete obsolete data' on DataBase")
         MYSQL = mysql.MYSQL()
         MYSQL.execute("DELETE FROM egs_games WHERE CONVERT_TZ(NOW(), 'System', 'GMT') > exp_date")
         MYSQL.execute("DELETE FROM yt_videos WHERE `status` = %s", values=YoutubeStreamStatus.FINISHED.value)
         MYSQL.commit(True)
         logger.info(f"Old data have been deleted on DataBase")
+    # endregion
 
     @bot.event
     async def on_guild_channel_delete(deleted_channel):
@@ -1060,9 +1067,10 @@ def discord_bot():
         await bot.wait_until_ready()
         logger.info(f"Logged in as {bot.user.name}({bot.user.id})")
         await bot.tree.sync()
+        await bot_task_get_free_games_list.start()
+        await bot_task_delete_old_data.start()
         for server in bot.guilds:
             await prepare_guild(server)
-        await delete_old_data.start()
 
     async def bot_load_settings(server):
         # local_flush_server_settings(server.id)
