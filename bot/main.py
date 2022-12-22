@@ -436,11 +436,11 @@ def discord_bot():
         # egs = GamerPowerParser()
         # if egs.empty:
         #     return
-        egs = BOT_CONFIG.get("FREE_GAMES", [])
-        if not egs:
+        FREE_GAMES = BOT_CONFIG.get("FREE_GAMES", [])
+        if not FREE_GAMES:
             return
         local_db = BOT_CONFIG[server.id]['match_egs']
-        for egs_game in egs.free_games:
+        for egs_game in FREE_GAMES:
             if egs_game.id not in local_db:
                 logger.info(f"Fetching game info: {egs_game.title}")
                 game_info, emb, view_ = egs_game.get_discord_game_card()
