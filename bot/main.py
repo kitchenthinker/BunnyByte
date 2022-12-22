@@ -434,8 +434,10 @@ def discord_bot():
             return
         # egs = EGSGamesParser()
         # egs = GamerPowerParser()
+        # if egs.empty:
+        #     return
         egs = BOT_CONFIG.get("FREE_GAMES", [])
-        if egs.empty:
+        if not egs:
             return
         local_db = BOT_CONFIG[server.id]['match_egs']
         for egs_game in egs.free_games:
