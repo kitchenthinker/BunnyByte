@@ -1067,10 +1067,10 @@ def discord_bot():
         await bot.wait_until_ready()
         logger.info(f"Logged in as {bot.user.name}({bot.user.id})")
         await bot.tree.sync()
-        await bot_task_get_free_games_list.start()
-        await bot_task_delete_old_data.start()
         for server in bot.guilds:
             await prepare_guild(server)
+        await bot_task_get_free_games_list.start()
+        await bot_task_delete_old_data.start()
 
     async def bot_load_settings(server):
         # local_flush_server_settings(server.id)
