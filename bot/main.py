@@ -225,18 +225,18 @@ def discord_bot():
         db_requests.server_update_settings(server, ytube['settings'])
         return True, logger_save_and_return_text(f"The loop is shut down on {server.name}")
 
-    async def task_egsgames_create(server: discord.Guild, check_hours: int, notification_channel: discord.TextChannel):
+    async def task_egsgames_create(server: discord.Guild, check_minutes: int, notification_channel: discord.TextChannel):
         egs_service = BOT_CONFIG[server.id]['features']['egs']
         task_to_run: tasks.Loop | None = egs_service.get('task')
         if task_to_run is None:
-            new_task = egs_service['task'] = tasks.loop(hours=check_hours)(get_games)
+            new_task = egs_service['task'] = tasks.loop(minutes=check_minutes)(get_games)
             task_to_run = new_task
         if task_to_run.is_running():
             return False, logger_save_and_return_text(f"EGS-Notificator is already running on {server.name}")
         else:
             egs_service = egs_service['settings']
             egs_service['enable']['value'] = True
-            egs_service['repeat']['value'] = check_hours
+            egs_service['repeat']['value'] = check_minutes
             egs_service['channel_id']['value'] = notification_channel.id
             db_requests.server_update_settings(server, egs_service)
             task_to_run.start(server, notification_channel)
@@ -450,11 +450,11 @@ def discord_bot():
 
     @commands_group_egs.command(name="start", description="Enable EGS Notificator.", extras=DEFER_YES)
     @app_commands.describe(notification_channel="Channel for sending notifications.",
-                           check_hours="Check new games every X hours. Default = 1")
+                           check_minutes="Check new games every X minutes. Default = 15")
     @discord_async_try_except_decorator
     async def egs_service_start(ctx: discord.Interaction,
                                 notification_channel: discord.TextChannel,
-                                check_hours: app_commands.Range[int, 1] = 1):
+                                check_minutes: app_commands.Range[int, 15] = 15):
         server = ctx.guild
         if not await passed_checks_before_start_command(
                 server, ctx, notification_channel,
@@ -462,7 +462,7 @@ def discord_bot():
                         StartChecks.CHANNEL_AVAILABLE]):
             return
 
-        task_status, task_message = await task_egsgames_create(server, check_hours, notification_channel)
+        task_status, task_message = await task_egsgames_create(server, check_minutes, notification_channel)
         await embed_output_server_message(ctx, task_message)
 
     @commands_group_egs.command(name="stop", description="Disable EGS Notificator.", extras=DEFER_YES)
@@ -940,7 +940,7 @@ def discord_bot():
                     return
             BOT_CONFIG[server.id]['match_egs'] = db_requests.server_get_matching_egs_list(server.id)
             task_status, task_message = await task_egsgames_create(
-                server=server, check_hours=int(egs_settings['repeat']['value']),
+                server=server, check_minutes=int(egs_settings['repeat']['value']),
                 notification_channel=egs_channel)
             if bot_channel is None:
                 return task_status, task_message
