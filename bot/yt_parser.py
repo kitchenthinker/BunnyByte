@@ -33,7 +33,7 @@ class YouTubeLiveStream(YouTube):
         self.upcoming_date: datetime | None = None
         self.greeting: str | None = None
 
-    def get_video_info(self, stream_status: YoutubeStreamStatus = None):
+    def get_video_info(self, stream_status: YoutubeStreamStatus = None, message_id = ''):
         return {
             'video_id': self.video_id,
             'title': self.title,
@@ -46,6 +46,7 @@ class YouTubeLiveStream(YouTube):
             'livestream': self.livestream,
             'upcoming': self.upcoming,
             'status': stream_status,
+            'message_id': message_id,
         }
 
     def get_discord_video_card(self):

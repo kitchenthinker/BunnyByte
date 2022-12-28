@@ -107,7 +107,8 @@ def server_get_matching_ytube_list(server_id: int | str = None):
     MYSQL = mysql.MYSQL()
     MYSQL.get_data(
         user_query="SELECT `video_id`, `title`, `author`, `publish_date`, `upcoming_date`,"
-                   "`thumbnail_url`, `watch_url`, `description`, `greeting`, `upcoming`, `livestream`, `status` "
+                   "`thumbnail_url`, `watch_url`, `description`, `greeting`, `upcoming`,"
+                   "`livestream`, `status`, `message_id` "
                    "FROM yt_videos WHERE server_id = %s",
         values=server_id
     )
@@ -181,34 +182,34 @@ def server_change_service_channel(server: Guild, bot_channel: TextChannel):
     MYSQL.commit()
 
 
-@simple_try_except_decorator
-def ytube_update_upcoming_stream_greeting(server_id, video_id, description):
+def ytube_update_custom_field(server_id, video_id, field, value):
+    logger.info(f"Update *yt_videos* | {field=}")
     MYSQL = mysql.MYSQL()
     MYSQL.execute(
-        user_query="UPDATE yt_videos SET `greeting` = %s WHERE `video_id` = %s and `server_id` = %s",
-        values=(description, video_id, server_id)
+        user_query=f"UPDATE yt_videos SET `{field}` = %s WHERE `video_id` = %s and `server_id` = %s",
+        values=(value, video_id, server_id)
     )
     MYSQL.commit(True)
+
+
+@simple_try_except_decorator
+def ytube_update_upcoming_stream_greeting(server_id, video_id, description):
+    ytube_update_custom_field(server_id, video_id, "greeting", description)
 
 
 @simple_try_except_decorator
 def ytube_update_upcoming_stream_date(server_id, video_id, upcoming_date):
-    MYSQL = mysql.MYSQL()
-    MYSQL.execute(
-        user_query="UPDATE yt_videos SET `upcoming_date` = %s WHERE `video_id` = %s and `server_id` = %s",
-        values=(upcoming_date, video_id, server_id)
-    )
-    MYSQL.commit(True)
+    ytube_update_custom_field(server_id, video_id, "upcoming_date", upcoming_date)
 
 
 @simple_try_except_decorator
 def ytube_update_stream_status(server_id, video_id, status: YoutubeStreamStatus):
-    MYSQL = mysql.MYSQL()
-    MYSQL.execute(
-        user_query="UPDATE yt_videos SET `status` = %s WHERE `video_id` = %s and `server_id` = %s",
-        values=(status.value, video_id, server_id)
-    )
-    MYSQL.commit(True)
+    ytube_update_custom_field(server_id, video_id, "status", status.value)
+
+
+@simple_try_except_decorator
+def ytube_update_stream_message_id(server_id, video_id, message_id = ''):
+    ytube_update_custom_field(server_id, video_id, "message_id", message_id)
 
 
 @simple_try_except_decorator

@@ -277,6 +277,12 @@ def discord_bot():
         BOT_CONFIG[server.id]['match_ytube'] = db_requests.server_get_matching_ytube_list(server.id)
 
     async def ytube_last_livestream(server, channel_for_notification: discord.TextChannel, yt_channel_url: str):
+        async def delete_notify_message(message_id):
+            if message_id != "":
+                notify_msg = await channel_for_notification.fetch_message(int(message_id))
+                if notify_msg is not None:
+                    await notify_msg.delete()
+
         # TODO: ChecksBeforeStart?
         yt_settings = BOT_CONFIG[server.id]['features']['ytube']['settings']
         server_ready = BOT_CONFIG[server.id]['ready']
@@ -311,19 +317,24 @@ def discord_bot():
 
             if yt_stream.upcoming:
                 if yt_stream.upcoming_date != upcoming_date_:
+                    await delete_notify_message(local_video['message_id'])
                     db_requests.ytube_update_upcoming_stream_date(server.id, video_id, yt_stream.upcoming_date)
-                    local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.ONLINE))
+                    local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.UPCOMING))
             elif yt_stream.livestream:
                 if status_ in [YoutubeStreamStatus.UPCOMING, YoutubeStreamStatus.NOTIFIED]:
                     db_requests.ytube_save_video_to_dbase(server, yt_stream, YoutubeStreamStatus.ONLINE, True)
-                    local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.ONLINE))
+                    local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.ONLINE, local_video['message_id']))
         # TODO: Stream first iteration is online
 
         local_video = server_stream_data[video_id]
         if local_video['status'] is YoutubeStreamStatus.ONLINE:
             video_info, emb, view_ = yt_stream.get_discord_video_card()
+
+            await delete_notify_message(local_video['message_id'])
+
             await channel_for_notification.send(content="@everyone", embed=emb, view=view_)
             db_requests.ytube_update_stream_status(server.id, video_id, YoutubeStreamStatus.NOTIFIED_ONLINE)
+            db_requests.ytube_update_stream_message_id(server.id, video_id)
             local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED_ONLINE))
         elif local_video['status'] is YoutubeStreamStatus.UPCOMING:
             # TODO: Checking UpcomingStream
@@ -335,9 +346,10 @@ def discord_bot():
             if stream_is_about_to_start:
                 # TODO: Change Video Status to NOTIFIED
                 video_info, emb, view_ = yt_stream.get_discord_video_card()
-                await channel_for_notification.send(content="@everyone", embed=emb, view=view_)
+                msg = await channel_for_notification.send(content="@everyone", embed=emb, view=view_)
                 db_requests.ytube_update_stream_status(server.id, video_id, YoutubeStreamStatus.NOTIFIED)
-                local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED))
+                db_requests.ytube_update_stream_message_id(server.id, video_id, msg.id)
+                local_video.update(yt_stream.get_video_info(YoutubeStreamStatus.NOTIFIED, msg.id))
 
         logger.info(f"Got video info: {local_video}")
 
@@ -1068,6 +1080,10 @@ def discord_bot():
             db_requests.server_delete_bot_registration(server.id)
             del BOT_CONFIG[server.id]
 
+    async def start_bot_tasks():
+        bot_task_get_free_games_list.start()
+        bot_task_delete_old_data.start()
+
     @bot.event
     async def on_ready():
         await bot.wait_until_ready()
@@ -1076,8 +1092,7 @@ def discord_bot():
         await bot.tree.sync()
         logger.info(f"Synchronizing has been finished.")
         logger.info(f"Launch bot tasks...")
-        bot_task_get_free_games_list.start()
-        bot_task_delete_old_data.start()
+        await start_bot_tasks()
         logger.info(f"Done.")
         logger.info(f"Prepare guilds...")
         for server in bot.guilds:
