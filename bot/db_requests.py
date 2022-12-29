@@ -11,19 +11,22 @@ from spinwheel_games import (
 from yt_parser import (YoutubeStreamStatus, YouTubeLiveStream)
 
 
+def mysql_getdata(*args, **kwargs):
+    MYSQL = mysql.MYSQL()
+    MYSQL.get_data(*args, **kwargs)
+    MYSQL.close()
+    return MYSQL
+
+
 @simple_try_except_decorator
 def server_get_status(server_id: int | str = None):
-    MYSQL = mysql.MYSQL()
-    MYSQL.get_data(f"SELECT * FROM `servers` WHERE `id`=%s", values=server_id)
-    MYSQL.close()
+    MYSQL = mysql_getdata(f"SELECT * FROM `servers` WHERE `id`=%s", values=server_id)
     return ServerStatus(not MYSQL.empty)
 
 
 @simple_try_except_decorator
 def server_get_bot_channels():
-    MYSQL = mysql.MYSQL()
-    MYSQL.get_data(f"SELECT service_channel, ready FROM `bot_config`")
-    MYSQL.close()
+    MYSQL = mysql_getdata(f"SELECT service_channel, ready FROM `bot_config`")
     if MYSQL.empty:
         return list() if MYSQL.empty else int(MYSQL.data)
 
@@ -33,13 +36,8 @@ def server_get_bot_settings(server_id: int | str = None):
     # LOCAL_SETTING = BOT_LOCAL_CONFIG.get('bot_channels')
     # if LOCAL_SETTING is not None:
     #     return server_id if server_id in LOCAL_SETTING else None
-    MYSQL = mysql.MYSQL()
-    MYSQL.get_data(f"SELECT service_channel, ready FROM `bot_config` WHERE `server_id`=%s", values=server_id)
-    MYSQL.close()
-    if MYSQL.empty:
-        return None, False
-    else:
-        return int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready'])
+    MYSQL = mysql_getdata(f"SELECT service_channel, ready FROM `bot_config` WHERE `server_id`=%s", values=server_id)
+    return (None, False) if MYSQL.empty else int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready'])
 
 
 @simple_try_except_decorator
@@ -121,24 +119,20 @@ def server_get_matching_egs_list(server_id: int | str = None):
     def return_dict():
         return {item['game_id']: item for item in MYSQL.data}
 
-    MYSQL = mysql.MYSQL()
-    MYSQL.get_data(
+    MYSQL = mysql_getdata(
         user_query="SELECT `game_id`, `title`, `description`, `url`, `exp_date`, `thumbnail` "
                    "FROM egs_games WHERE server_id = %s",
         values=server_id
     )
-    MYSQL.close()
     return {} if MYSQL.empty else return_dict()
 
 
 @simple_try_except_decorator
 def server_get_spinwheel_list(server_id: int | str = None):
-    MYSQL = mysql.MYSQL()
-    MYSQL.get_data(
+    MYSQL = mysql_getdata(
         user_query="SELECT game, status, url, comment FROM spin_wheel WHERE server_id = %s ORDER BY `status`, game",
         values=server_id
     )
-    MYSQL.close()
     return dict() if MYSQL.empty else {x['game']: {"status": SpinWheelGameStatus(x['status']),
                                                    "url": x['url'],
                                                    "comment": x['comment']} for x in MYSQL.data}
@@ -208,7 +202,7 @@ def ytube_update_stream_status(server_id, video_id, status: YoutubeStreamStatus)
 
 
 @simple_try_except_decorator
-def ytube_update_stream_message_id(server_id, video_id, message_id = ''):
+def ytube_update_stream_message_id(server_id, video_id, message_id=''):
     ytube_update_custom_field(server_id, video_id, "message_id", message_id)
 
 
