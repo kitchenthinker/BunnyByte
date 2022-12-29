@@ -17,6 +17,7 @@ LIVESTREAM_IMG = "https://img.informer.com/icons_mac/png/128/448/448535.png"
 
 
 class YoutubeStreamStatus(Enum):
+    ERROR = 0
     UPCOMING = 1
     NOTIFIED = 2
     ONLINE = 3
