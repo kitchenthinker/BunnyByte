@@ -14,35 +14,42 @@ class SpinWheelGameStatus(Enum):
     InFinishedList = 2
     InWaitingList = 3
     InBanList = 4
+    InListStream = 5
 
 
 game_status_dict = {
     SpinWheelGameStatus.InList: {
-        "name": "1. В Рулетке.",
+        "name": "В Рулетке.",
         "value": SpinWheelGameStatus.InList.value,
         "emoji": "🎡",
         "description": "Список игр, вошедших в рулетку.",
         "show_pl": False},
+    SpinWheelGameStatus.InListStream: {
+        "name": "1. В Рулетке (Стримы).",
+        "value": SpinWheelGameStatus.InListStream.value,
+        "emoji": "🌊",
+        "description": "Список игр, вошедших в рулетку (стримы).",
+        "show_pl": False},
     SpinWheelGameStatus.InProgress: {
-        "name": "2. Проходим.",
+        "name": "Проходим.",
         "value": SpinWheelGameStatus.InProgress.value,
         "emoji": "🎮",
         "description": "Список игр в процессе прохождения.",
         "show_pl": True},
     SpinWheelGameStatus.InFinishedList: {
-        "name": "3. Закончили.",
+        "name": "Закончили.",
         "value": SpinWheelGameStatus.InFinishedList.value,
         "emoji": "✅",
         "description": "Список уже пройденных игр.",
         "show_pl": True},
     SpinWheelGameStatus.InWaitingList: {
-        "name": "4. Ждем.",
+        "name": "Ждем.",
         "value": SpinWheelGameStatus.InWaitingList.value,
         "emoji": "😗",
         "description": "Список предложенных, но ещё не вышедших игр.",
         "show_pl": False},
     SpinWheelGameStatus.InBanList: {
-        "name": "5. Баня.",
+        "name": "Баня.",
         "value": SpinWheelGameStatus.InBanList.value, "emoji": "🥵",
         "description": "Игры из этого списка можно попытаться реабилитировать массовыми уговорами. "
                        "Если очень долго будете пытать УРАЗАЙКУ, возможно, она сдастся. А, возможно, и нет. 😝 "
@@ -61,7 +68,8 @@ class SpinWheelGameStatusEdit(Enum):
     InFinishedList = 2
     InWaitingList = 3
     InBanList = 4
-    Previous = 5
+    InListStream = 5
+    Previous = 6
 
 
 class SpinWheelAction(Enum):

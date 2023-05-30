@@ -626,18 +626,21 @@ def discord_bot():
         await interaction.edit_original_response(embed=emb)
 
     @commands_group_spinwheel.command(name="poll", description="Create a poll.", extras={'use_defer': False})
-    @app_commands.describe(count="How many games do you want to choose? Default = 3", defer="Visible only for you")
+    @app_commands.describe(count="How many games do you want to choose? Default = 3",
+                           streams="Is it a list 'Games for Stream'? Default = No",
+                           defer="Visible only for you")
     @discord_async_try_except_decorator
     async def spinwheel_poll(interaction: discord.Interaction, count: app_commands.Range[int, 1, 5] = 3,
+                             streams: SettingYesNo = SettingYesNo.Yes,
                              defer: SettingYesNo = SettingYesNo.Yes):
         server = interaction.guild
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
             return
-
+        GameListFilter = SpinWheelGameStatus.InList if streams is SettingYesNo.No else SpinWheelGameStatus.InListStream
         game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
-                     if item['status'] is SpinWheelGameStatus.InList]
+                     if item['status'] is GameListFilter]
         if not game_list:
             await embed_output_server_message(interaction, f'The Game List is empty.')
             return
@@ -648,7 +651,7 @@ def discord_bot():
 
         emb = discord.Embed(
             title="Уразайка-Поиграйка!",
-            description="Пора выбирать во что играть."
+            description="Пора выбирать, во что поиграть."
         )
         for _ in range(count):
             if not game_list:
@@ -1067,7 +1070,7 @@ def discord_bot():
             await bot.tree.sync(guild=server)
             await bot_load_settings(server)
             if (bot_channel := BOT_CONFIG[server.id]['bot_channel']) is not None:
-                await bot_say_hi_to_registered_server(server, bot_channel)
+                pass# await bot_say_hi_to_registered_server(server, bot_channel)
             # Check LOOPS here
             await run_services_task(server)
             logger.info(f"Server:[{server.name}]:[{server.id}]")

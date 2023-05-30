@@ -3,7 +3,7 @@ asyncio~=3.4.3
 requests~=2.27.1
 discord~=2.1.0
 python-dotenv~=0.20.0
-#pytube~=12.1.3
+#pytube~=15.0.0
 pytube @ git+https://github.com/Federico-German/pytube-fixed
 aiohttp~=3.8.1
 beautifulsoup4~=4.11.1
