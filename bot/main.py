@@ -628,15 +628,17 @@ def discord_bot():
     @commands_group_spinwheel.command(name="poll", description="Create a poll.", extras={'use_defer': False})
     @app_commands.describe(count="How many games do you want to choose? Default = 3",
                            streams="Is it a list 'Games for Stream'? Default = No",
-                           defer="Visible only for you")
+                           defer="Visible only for you. Default = Yes")
     @discord_async_try_except_decorator
     async def spinwheel_poll(interaction: discord.Interaction, count: app_commands.Range[int, 1, 5] = 3,
-                             streams: SettingYesNo = SettingYesNo.Yes,
+                             streams: SettingYesNo = SettingYesNo.No,
                              defer: SettingYesNo = SettingYesNo.Yes):
         server = interaction.guild
+        await interaction.response.defer(ephemeral=defer.value)
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
             return
+
         GameListFilter = SpinWheelGameStatus.InList if streams is SettingYesNo.No else SpinWheelGameStatus.InListStream
         game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
@@ -661,7 +663,6 @@ def discord_bot():
             game_list.remove(game_)
         # emb.set_footer(text=game_["comment"])
         emb.set_thumbnail(url='https://cdn-icons-png.flaticon.com/256/9217/9217844.png')
-        await interaction.response.defer(ephemeral=defer.value)
         await interaction.edit_original_response(embed=emb)
 
     class Select(discord.ui.Select):
