@@ -25,7 +25,7 @@ game_status_dict = {
         "description": "Список игр, вошедших в рулетку.",
         "show_pl": False},
     SpinWheelGameStatus.InListStream: {
-        "name": "1. В Рулетке (Стримы).",
+        "name": "В Рулетке (Стримы).",
         "value": SpinWheelGameStatus.InListStream.value,
         "emoji": "🌊",
         "description": "Список игр, вошедших в рулетку (стримы).",
