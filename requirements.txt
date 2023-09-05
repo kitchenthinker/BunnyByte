@@ -4,7 +4,7 @@ requests~=2.27.1
 discord~=2.2.3
 python-dotenv~=0.20.0
 #pytube~=15.0.0
-pytube @ git+https://github.com/oncename/pytube
-#pytube @ git+https://github.com/Federico-German/pytube-fixed
+#pytube @ git+https://github.com/oncename/pytube
+pytube @ git+https://github.com/Federico-German/pytube-fixed
 aiohttp~=3.8.1
 beautifulsoup4~=4.11.1
