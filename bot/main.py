@@ -819,11 +819,11 @@ def discord_bot():
             egs_task = BOT_CONFIG[server.id]['features']['egs']['task']
             ytube_task = BOT_CONFIG[server.id]['features']['ytube']['task']
             if egs_task is not None:
-                egs_info = f"Task has been found: Next launch (GMT): " \
-                           f"{datetime.strftime(egs_task.next_iteration, '%d.%m.%y %H:%M')}"
+                next_iteration = datetime.strftime(egs_task.next_iteration, '%d.%m.%y %H:%M') if egs_task.next_iteration is not None else "None"
+                egs_info = f"Task has been found: Next launch (GMT): {next_iteration}"
             if ytube_task is not None:
-                ytube_info = f"Task has been found: Next launch (GMT): " \
-                             f"{datetime.strftime(ytube_task.next_iteration, '%d.%m.%y %H:%M')}"
+                next_iteration = datetime.strftime(ytube_task.next_iteration, '%d.%m.%y %H:%M') if ytube_task.next_iteration is not None else "None"
+                ytube_info = f"Task has been found: Next launch (GMT): {next_iteration}"
         emb = discord.Embed(title="SERVER-INFO", )
         emb.add_field(name="Name", value=f"[**{ctx.guild.name}**]")
         emb.add_field(name="ID", value=f"[**{ctx.guild.id}**]")
