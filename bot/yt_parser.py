@@ -8,6 +8,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from enum import Enum
+import re
 
 YT_URL = "https://www.youtube.com/channel"
 BUNNY_CHANNEL_ID = "https://www.youtube.com/channel/UCuS7pDu3Pyrk0fXOL_TnCNQ"
@@ -94,12 +95,14 @@ class YTLiveStreamParser:
                 live = livestream_data.find("link", {"rel": "canonical"})
                 temp_livestream = YouTubeLiveStream(live.attrs['href'])
                 if temp_livestream.channel_id is not None:
-                    temp_livestream.upcoming = False #temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
+                    temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
                     temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
                     if temp_livestream.upcoming:
-                        timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
-                            'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
-                            'scheduledStartTime']
+                        re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
+                        timestamp = re_result[0]
+                        #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
+                         #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
+                          #  'scheduledStartTime']
                         temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
                             seconds=int(timestamp))
                     current_livestream = temp_livestream
