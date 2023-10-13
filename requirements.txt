@@ -1,6 +1,6 @@
 pymysql~=1.0.2
 asyncio~=3.4.3
-requests~=2.31.0
+requests~=2.27.1
 discord~=2.2.3
 python-dotenv~=0.20.0
 #pytube~=15.0.0
