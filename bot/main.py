@@ -7,6 +7,7 @@ import mysql
 import random
 import joke
 
+from background import keep_alive
 from datetime import datetime
 
 from helpers import (
@@ -1120,7 +1121,8 @@ def discord_bot():
             'match_egs': db_requests.server_get_matching_egs_list(server.id),
             'spin_wheel': db_requests.server_get_spinwheel_list(server.id),
         }
-
+        
+    keep_alive()
     bot.run(token=config.BUNNYBYTE_TOKEN)
 
 
