@@ -9,7 +9,7 @@ def home():
   return "I'm alive"
 
 def run():
-  app.run()
+  app.run(host="https://common-aubine-bunnybytedev.koyeb.app")
 
 def keep_alive():
   t = Thread(target=run)
