@@ -7,5 +7,3 @@ python-dotenv~=0.20.0
 pytube @ git+https://github.com/Federico-German/pytube-fixed
 aiohttp~=3.8.1
 beautifulsoup4~=4.11.1
-threading
-flask
