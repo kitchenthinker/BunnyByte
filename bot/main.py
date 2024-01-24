@@ -7,7 +7,7 @@ import mysql
 import random
 import joke
 
-from background import keep_alive
+from background import keep_alive, app
 from datetime import datetime
 
 from helpers import (
