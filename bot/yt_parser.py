@@ -93,20 +93,20 @@ class YTLiveStreamParser:
 
             if livestream_data is not None:
                 live = livestream_data.find("link", {"rel": "canonical"})
-                if live is None: break
-                temp_livestream = YouTubeLiveStream(live.attrs['href'])
-                if temp_livestream.channel_id is not None:
-                    temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
-                    temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
-                    if temp_livestream.upcoming:
-                        re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
-                        timestamp = re_result[0]
-                        #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
-                         #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
-                          #  'scheduledStartTime']
-                        temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
-                            seconds=int(timestamp))
-                    current_livestream = temp_livestream
+                if live is not None:
+                    temp_livestream = YouTubeLiveStream(live.attrs['href'])
+                    if temp_livestream.channel_id is not None:
+                        temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
+                        temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
+                        if temp_livestream.upcoming:
+                            re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
+                            timestamp = re_result[0]
+                            #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
+                             #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
+                              #  'scheduledStartTime']
+                            temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
+                                seconds=int(timestamp))
+                        current_livestream = temp_livestream
         self.current_livestream = current_livestream
         return current_livestream
 
