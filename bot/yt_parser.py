@@ -93,6 +93,7 @@ class YTLiveStreamParser:
 
             if livestream_data is not None:
                 live = livestream_data.find("link", {"rel": "canonical"})
+                if live is None: break
                 temp_livestream = YouTubeLiveStream(live.attrs['href'])
                 if temp_livestream.channel_id is not None:
                     temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
