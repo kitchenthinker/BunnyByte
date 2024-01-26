@@ -90,10 +90,10 @@ class YTLiveStreamParser:
             async with session.get(channel_url, cookies={'CONSENT': 'YES+42'}) as page:
                 if page.status == 200:
                     livestream_data = BeautifulSoup(await page.text(), "html.parser")
-
+            
             if livestream_data is not None:
                 live = livestream_data.find("link", {"rel": "canonical"})
-                if live is not None:
+                if (live is not None) and (live.attrs.get('href') is not None):
                     temp_livestream = YouTubeLiveStream(live.attrs['href'])
                     if temp_livestream.channel_id is not None:
                         temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
@@ -101,11 +101,10 @@ class YTLiveStreamParser:
                         if temp_livestream.upcoming:
                             re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
                             timestamp = re_result[0]
-                            #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
-                             #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
-                              #  'scheduledStartTime']
-                            temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
-                                seconds=int(timestamp))
+                        #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
+                         #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
+                          #  'scheduledStartTime']
+                            temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(seconds=int(timestamp))
                         current_livestream = temp_livestream
         self.current_livestream = current_livestream
         return current_livestream
