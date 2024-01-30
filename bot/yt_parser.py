@@ -116,5 +116,5 @@ class YTLiveStreamParser:
                         print(f"{temp_livestream.title} | {temp_livestream.upcoming_date}")
                     current_livestream = temp_livestream
         self.current_livestream = current_livestream
-        if self.current_livestreamprint is not None: print(f"{current_livestream.title} | {temp_livestream.upcoming_date}")
+        if self.current_livestream is not None: print(f"{current_livestream.title} | {temp_livestream.upcoming_date}")
         return current_livestream
