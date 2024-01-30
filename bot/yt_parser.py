@@ -94,11 +94,13 @@ class YTLiveStreamParser:
     async def get_last_livestream(self) -> YouTubeLiveStream:
         current_livestream = self.current_livestream
         livestream_data = await self.get_html_page_info()
-
+        print(f"{livestream_data=}")
         if livestream_data is not None:
             live = livestream_data.find("link", {"rel": "canonical"})
+            print(f"{live=}")
             if live is not None:
                 temp_livestream = YouTubeLiveStream(live.get('href'))
+                 print(f"{temp_livestream=}")
                 if temp_livestream.channel_id is not None:
                     temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
                     temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
@@ -114,5 +116,5 @@ class YTLiveStreamParser:
                         print(f"{temp_livestream.title} | {temp_livestream.upcoming_date}")
                     current_livestream = temp_livestream
         self.current_livestream = current_livestream
-        print(f"{current_livestream.title} | {temp_livestream.upcoming_date}")
+        if self.current_livestreamprint is not None: print(f"{current_livestream.title} | {temp_livestream.upcoming_date}")
         return current_livestream
