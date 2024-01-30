@@ -1,4 +1,4 @@
-from pytube import (
+from pytubefix import (
     Channel,
     YouTube,
 )
@@ -114,4 +114,5 @@ class YTLiveStreamParser:
                         print(f"{temp_livestream.title} | {temp_livestream.upcoming_date}")
                     current_livestream = temp_livestream
         self.current_livestream = current_livestream
+        print(f"{current_livestream.title} | {temp_livestream.upcoming_date}")
         return current_livestream
