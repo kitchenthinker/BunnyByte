@@ -100,7 +100,7 @@ class YTLiveStreamParser:
             print(f"{live=}")
             if live is not None:
                 temp_livestream = YouTubeLiveStream(live.get('href'))
-                 print(f"{temp_livestream=}")
+                print(f"{temp_livestream=}")
                 if temp_livestream.channel_id is not None:
                     temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
                     temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
