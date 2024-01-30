@@ -94,7 +94,7 @@ class YTLiveStreamParser:
     async def get_last_livestream(self) -> YouTubeLiveStream:
         current_livestream = self.current_livestream
         livestream_data = await self.get_html_page_info()
-        print(f"{livestream_data[:100]}")
+        #print(f"{livestream_data[:100]}")
         if livestream_data is not None:
             live = livestream_data.find("link", {"rel": "canonical"})
             print(f"{live=}")
