@@ -85,7 +85,7 @@ class YTLiveStreamParser:
     async def get_html_page_info(self):
         async with aiohttp.ClientSession() as session:
             channel_url = f"{self.channel_url}/live"
-            async with session.get(channel_url, cookies={'CONSENT': 'PENDING+999'}) as page:
+            async with session.get(channel_url, cookies={'CONSENT': 'YES+NL.en-GB+V9+BX+723'}) as page:
                 if page.status == 200:
                     return BeautifulSoup(await page.text(), "html.parser")
                 else:
@@ -94,7 +94,7 @@ class YTLiveStreamParser:
     async def get_last_livestream(self) -> YouTubeLiveStream:
         current_livestream = self.current_livestream
         livestream_data = await self.get_html_page_info()
-        print(f"{livestream_data=}")
+        print(f"{livestream_data[:100]}")
         if livestream_data is not None:
             live = livestream_data.find("link", {"rel": "canonical"})
             print(f"{live=}")
