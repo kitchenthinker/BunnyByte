@@ -82,125 +82,36 @@ class YTLiveStreamParser:
     def get_discord_video_card(stream: YouTubeLiveStream):
         return stream.get_discord_video_card()
 
-    async def get_last_livestream(self) -> YouTubeLiveStream:
-        livestream_data = None
-        current_livestream = self.current_livestream
+    async def get_html_page_info(self):
         async with aiohttp.ClientSession() as session:
             channel_url = f"{self.channel_url}/live"
             async with session.get(channel_url, cookies={'CONSENT': 'YES+42'}) as page:
                 if page.status == 200:
-                    livestream_data = BeautifulSoup(await page.text(), "html.parser")
+                    return BeautifulSoup(await page.text(), "html.parser")
+                else:
+                    return None
 
-            if livestream_data is not None:
-                live = livestream_data.find("link", {"rel": "canonical"})
-                if live.attrs.get('href', None) is not None:
-                    temp_livestream = YouTubeLiveStream(live.attrs['href'])
-                    if temp_livestream.channel_id is not None:
-                        temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
-                        temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
-                        if temp_livestream.upcoming:
-                            re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
-                            timestamp = re_result[0]
-                            #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
-                             #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
-                              #  'scheduledStartTime']
-                            temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
-                                seconds=int(timestamp))
-                        current_livestream = temp_livestream
+    async def get_last_livestream(self) -> YouTubeLiveStream:
+        current_livestream = self.current_livestream
+        livestream_data = await self.get_html_page_info()
+
+        if livestream_data is not None:
+            live = livestream_data.find("link", {"rel": "canonical"})
+            if live is not None:
+                temp_livestream = YouTubeLiveStream(live.get('href'))
+                if temp_livestream.channel_id is not None:
+                    temp_livestream.upcoming = temp_livestream.vid_info['videoDetails'].get('isUpcoming', False)
+                    temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
+                    if temp_livestream.upcoming:
+                        re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
+                        timestamp = re_result[0]
+
+                        #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability'][
+                         #   'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
+                          #  'scheduledStartTime']
+                        temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
+                            seconds=int(timestamp))
+                        print(f"{temp_livestream.title} | {temp_livestream.upcoming_date}")
+                    current_livestream = temp_livestream
         self.current_livestream = current_livestream
         return current_livestream
-
-# class YTParser:
-#
-#     def __init__(self, channel_id: str = BUNNY_CHANNEL_ID, create_channel_object: bool = True):
-#         self.channelURL = f"{channel_id}"
-#
-#         self.channel: Channel = Channel(url=self.channelURL) if create_channel_object else None
-#         self.author: str | None = None
-#         self.currentVideo: YouTube | None = None
-#         self.currentLiveStream: YouTube | None = None
-#         self.isLivestream: bool = False
-#         self.isUpcoming: bool = False
-#         self.isLiveContent: bool = False
-#         self.channelIsEmpty: bool = self.is_channel_empty()
-#         self.upcomingDate: datetime | None = None
-#         if self.channel is not None:
-#             self.fetch_last_videos()
-#
-#     def is_channel_empty(self):
-#         if self.channel is None:
-#             return None
-#         return self.channel.__len__() == 0
-#
-#     def fetch_last_videos(self):
-#         if not self.channelIsEmpty:
-#             last_video = self.channel.videos[0]
-#             self.set_current_video(last_video)
-#             self.set_is_livestream(last_video)
-#             # self.get_last_livestream()
-#
-#     def set_is_livestream(self, video: YouTube):
-#         self.isLivestream = video.length == 0
-#
-#     def set_current_video(self, video: YouTube):
-#         self.currentVideo = video
-#
-#     # def get_last_livestream(self, max_index: int = 7):
-#     #     streams_slice = [x for x in self.channel.videos[:max_index] if x.length == 0]
-#     #     self.current_livestream = streams_slice[0] if streams_slice else None
-#
-#     @staticmethod
-#     def get_video_info(video: YouTube):
-#         return {
-#             'video_id': video.video_id,
-#             'title': video.title,
-#             'author': video.author,
-#             'description': video.description,
-#             'publish_date': video.publish_date,
-#             'thumbnail_url': video.thumbnail_url,
-#             'watch_url': video.watch_url,
-#             'livestream': video.length == 0,
-#             'isUpcoming': video.vid_info['videoDetails'].get('isUpcoming', False),
-#             'isLiveContent': video.vid_info['videoDetails'].get('isLiveContent', False),
-#         }
-#
-#     def get_discord_video_card(self, video: YouTube, show_description: bool = False, is_livestream: bool = False):
-#         video_info = self.get_video_info(video)
-#         video_description = video_info['description'] if show_description else None
-#         embed_card = Embed(title=video_info['title'],
-#                            url=video_info['watch_url'],
-#                            description=video_description,
-#                            # timestamp=video_info['publish_date'],
-#                            colour=Colour.purple())
-#
-#         # embed_card.set_thumbnail(url='./img/yt_logo.png')
-#         embed_card.set_author(name=video_info['author'])
-#         embed_card.set_image(url=video_info['thumbnail_url'])
-#         if is_livestream:
-#             embed_card.set_thumbnail(url=LIVESTREAM_IMG)
-#         video_button = Button(label="🐰 Смотреть 🥕", style=ButtonStyle.red, url=video_info['watch_url'])
-#         dc_view = View()
-#         dc_view.add_item(video_button)
-#         return video_info, embed_card, dc_view
-#
-#     async def get_last_livestream(self, channel_url: str = None):
-#         channel_url = self.channelURL if channel_url is None else channel_url
-#         current_livestream = None
-#         async with aiohttp.ClientSession() as session:
-#             channel_url = f"{channel_url}/live"
-#             async with session.get(channel_url, cookies={'CONSENT': 'YES+42'}) as page:
-#                 if page.status == 200:
-#                     soup = BeautifulSoup(await page.text(), "html.parser")
-#                     live = soup.find("link", {"rel": "canonical"})
-#                     current_livestream = YouTube(live.attrs['href'])
-#                     if current_livestream.channel_id is not None:
-#                         self.isUpcoming = current_livestream.vid_info['videoDetails'].get('isUpcoming', False)
-#                         self.isLiveContent = False if self.isUpcoming else True
-#                         self.author = current_livestream.author
-#                         if self.isUpcoming:
-#                             timestamp = current_livestream.vid_info['playabilityStatus']['liveStreamability'][
-#                                 'liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer'][
-#                                 'scheduledStartTime']
-#                             self.upcomingDate = datetime(1970, 1, 1, 0, 0, 0) + timedelta(seconds=int(timestamp))
-#         self.currentLiveStream = current_livestream
-#         return self
