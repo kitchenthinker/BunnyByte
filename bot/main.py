@@ -1026,7 +1026,8 @@ def discord_bot():
         logger.info(f"Starting task 'Delete obsolete data' on DataBase")
         MYSQL = mysql.MYSQL()
         MYSQL.execute("DELETE FROM egs_games WHERE CONVERT_TZ(NOW(), 'System', 'GMT') > exp_date")
-        MYSQL.execute("DELETE FROM yt_videos WHERE `status` = %s", values=YoutubeStreamStatus.FINISHED.value)
+        MYSQL.execute("DELETE FROM yt_videos WHERE DATEDIFF(CURDATE(), upcoming_date) > 1")
+        #MYSQL.execute("DELETE FROM yt_videos WHERE `status` = %s", values=YoutubeStreamStatus.FINISHED.value)
         MYSQL.commit(True)
         logger.info(f"Old data have been deleted on DataBase")
 
