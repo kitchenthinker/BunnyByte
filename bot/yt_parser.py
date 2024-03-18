@@ -1,4 +1,4 @@
-from pytubefix import (
+from pytube import (
     Channel,
     YouTube,
 )
