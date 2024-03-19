@@ -1,4 +1,4 @@
-from pytube import (
+from pytubefix import (
     Channel,
     YouTube,
 )
@@ -107,10 +107,10 @@ class YTLiveStreamParser:
                     temp_livestream.livestream = temp_livestream.vid_info['videoDetails'].get('isLive', False)
                     if temp_livestream.upcoming:
                         print('upcoming_livestream')
-                        #re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
-                        #timestamp = re_result[0]
+                        re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
+                        timestamp = re_result[0]
 
-                        timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability']['liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer']['scheduledStartTime']
+                        #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability']['liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer']['scheduledStartTime']
                         temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
                             seconds=int(timestamp))
                         print(f"{temp_livestream.title} | {temp_livestream.upcoming_date}")
