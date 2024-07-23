@@ -5,7 +5,7 @@ discord~=2.2.3
 python-dotenv~=0.20.0
 #pytube~=15.0.0
 #pytube @ git+https://github.com/Federico-German/pytube-fixed
-#pytubefix==6.1.1
-pytubefix @ git+https://github.com/kitchenthinker/pytubefix_regex_patch
+pytubefix==3.0.0
+#pytubefix @ git+https://github.com/kitchenthinker/pytubefix_regex_patch
 aiohttp~=3.8.1
 beautifulsoup4~=4.11.1
