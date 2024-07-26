@@ -85,7 +85,9 @@ class YTLiveStreamParser:
     async def get_html_page_info(self):
         async with aiohttp.ClientSession() as session:
             channel_url = f"{self.channel_url}/live"
-            async with session.get(channel_url, cookies={'CONSENT': 'PENDING+987','SOCS': 'CAESHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmRlIAEaBgiAo_CmBg'}) as page:
+            _headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"}
+            _cookies = {"CONSENT": "PENDING+987", "SOCS": "CAESHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmRlIAEaBgiAo_CmBg"}
+            async with session.get(channel_url, cookies=_cookies, headers=_headers) as page:
                 if page.status == 200:
                     return BeautifulSoup(await page.text(), "html.parser")
                 else:
