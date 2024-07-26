@@ -99,6 +99,8 @@ class YTLiveStreamParser:
             live = livestream_data.find("link", {"rel": "canonical"})
             print(f"{live=}")
             if live is not None:
+                print(live)
+                print(live.get('href'))
                 temp_livestream = YouTubeLiveStream(live.get('href'))
                 #print(f"{temp_livestream.get('channel_id', "No channelID")}")
                 if temp_livestream.channel_id is not None:
