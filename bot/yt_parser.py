@@ -85,7 +85,7 @@ class YTLiveStreamParser:
     async def get_html_page_info(self):
         async with aiohttp.ClientSession() as session:
             channel_url = f"{self.channel_url}/live"
-            _headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"}
+            _headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"}
             _cookies = {"CONSENT": "PENDING+987", "SOCS": "CAESHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmRlIAEaBgiAo_CmBg"}
             async with session.get(channel_url, cookies=_cookies, headers=_headers) as page:
                 if page.status == 200:
@@ -101,9 +101,9 @@ class YTLiveStreamParser:
             live = livestream_data.find("link", {"rel": "canonical"})
             print(f"{live=}")
             if live is not None:
-                print(live)
+                print('Im here',live)
                 print(live.get('href'))
-                temp_livestream = YouTubeLiveStream(live.get('href'))
+                temp_livestream = YouTubeLiveStream(live.get('href',f"{self.channel_url}/live"))
                 #print(f"{temp_livestream.get('channel_id', "No channelID")}")
                 if temp_livestream.channel_id is not None:
                     print("temp_livesteam")
