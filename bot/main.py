@@ -346,7 +346,7 @@ def discord_bot():
             post_card_emb, post_card_view = yt_msg_post.get_discord_msg_card()
             await channel_for_notification.send(content="@everyone", embed=post_card_emb, view=post_card_view)
             
-            db_requests.server_community_message_update(server.id, yt_msg_post.msg_id)
+            db_requests.server_community_message_update(server, yt_msg_post.msg_id)
             
         logger.info(f"Обработано новое сообщение в сообществе {yt_msg_post.msg_id}")
 
