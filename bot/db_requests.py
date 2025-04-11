@@ -38,9 +38,9 @@ def server_get_bot_settings(server_id: int | str = None):
     #     return server_id if server_id in LOCAL_SETTING else None
     MYSQL = mysql_getdata(f"SELECT service_channel, ready, msg_id FROM `bot_config` WHERE `server_id`=%s", values=server_id)
     if MYSQL.empty:
-        return None, False
+        return None, False, None
     else:
-        return int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready']), MYSQL.data[0]['msg_id']
+        return (int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready']), MYSQL.data[0]['msg_id'])
 
 ###
 # UPDATE 10/04/2025
