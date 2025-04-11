@@ -207,13 +207,13 @@ def discord_bot():
             return False, logger_save_and_return_text(f"YT Message Notificator is already running on {server.name}")
         else:
 
-            ytube_msg = ytube_msg['settings']
-            ytube_msg['enable']['value'] = True
-            ytube_msg['repeat']['value'] = check_minutes
-            ytube_msg['yt_channel']['value'] = yt_channel_url
-            ytube_msg['channel_id']['value'] = notification_channel.id
+            ytube_msg_sets = ytube_msg['settings']
+            ytube_msg_sets['enable']['value'] = True
+            ytube_msg_sets['repeat']['value'] = check_minutes
+            ytube_msg_sets['yt_channel']['value'] = yt_channel_url
+            ytube_msg_sets['channel_id']['value'] = notification_channel.id
 
-            db_requests.server_update_settings(server, ytube_msg)
+            db_requests.server_update_settings(server, ytube_msg_sets)
             task_to_run.start(server, notification_channel, yt_channel_url)
             return True, logger_save_and_return_text(f"YT Message Notificator is alive on {server.name}")
 
@@ -335,7 +335,7 @@ def discord_bot():
         # TODO: Получить данные по сообщению;
         ytube_msg['msg_id'] = db_requests.server_community_message_get(server.id)
         yt_msg_post = YouTubeLastMessageTabParser(ytube_msg['msg_id'], yt_channel_indent)
-        yt_msg_post.check_new_community_post()
+        await yt_msg_post.check_new_community_post()
         if yt_msg_post.status is YoutubeMessageStatus.NOTIFIED:
             logger.info(f"Нет новых сообщений во вкладе сообщества")
             return
