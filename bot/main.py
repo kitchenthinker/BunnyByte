@@ -23,6 +23,9 @@ from discord.ext import (
     commands, tasks,
 )
 from yt_parser import YTLiveStreamParser, YouTubeLiveStream, YoutubeStreamStatus
+# ADD 10/04/25
+from yt_msg_parser import YouTubeLastMessageTabParser, YoutubeMessageStatus
+# ADD 10/04/25
 from egs_parser import EGSGamesParser, EGSGame
 from gp_parser import GamerPowerParser, GamerPowerGame
 from enums import *
@@ -52,7 +55,10 @@ def local_flush_server_settings(server: discord.Guild):
     BOT_CONFIG[server.id]['status'] = ServerStatus.UNREGISTERED
     BOT_CONFIG[server.id]['features'] = {
         'egs': {'settings': None, 'task': None, },
-        'ytube': {'settings': None, 'task': None, }
+        'ytube': {'settings': None, 'task': None, },
+        # ADD 10/04/25
+        'ytube_msg': {'settings': None, 'task': None, 'msg_id': None },
+        # ADD 10/04/25
     }
     BOT_CONFIG[server.id]['match_ytube'] = {}
     BOT_CONFIG[server.id]['match_egs'] = {}
@@ -185,6 +191,48 @@ def discord_bot():
 
         return True
 
+# ADD 10/04/25
+    async def task_ytube_msg_create(server: discord.Guild,
+                                    check_minutes: int,
+                                    yt_channel_url: str, 
+                                    notification_channel: discord.TextChannel):
+
+        ytube_msg = BOT_CONFIG[server.id]['features']['ytube_msg']
+        task_to_run: tasks.Loop | None = ytube_msg.get('task')
+
+        if task_to_run is None:
+            new_task = ytube_msg['task'] = tasks.loop(minutes=check_minutes)(ytube_last_msg)
+            task_to_run = new_task
+        if task_to_run.is_running():
+            return False, logger_save_and_return_text(f"YT Message Notificator is already running on {server.name}")
+        else:
+
+            ytube_msg = ytube_msg['settings']
+            ytube_msg['enable']['value'] = True
+            ytube_msg['repeat']['value'] = check_minutes
+            ytube_msg['yt_channel']['value'] = yt_channel_url
+            ytube_msg['channel_id']['value'] = notification_channel.id
+
+            db_requests.server_update_settings(server, ytube_msg)
+            task_to_run.start(server, notification_channel, yt_channel_url)
+            return True, logger_save_and_return_text(f"YT Message Notificator is alive on {server.name}")
+
+    async def task_ytube_msg_stop(server: discord.Guild):
+        ytube_msg = BOT_CONFIG[server.id]['features']['ytube_msg']
+        task_to_run: tasks.Loop | None = ytube_msg.get('task')
+
+        if task_to_run is None:
+            return False, logger_save_and_return_text(f"Nothing to stop on {server.name}")
+        task_to_run.cancel()
+
+        ytube_msg['task'] = None
+        ytube_msg['settings']['enable']['value'] = False
+
+        db_requests.server_update_settings(server, ytube_msg['settings'])
+        return True, logger_save_and_return_text(f"The loop is shut down on {server.name}")
+
+# ADD 10/04/25
+
     async def task_ytube_create(server: discord.Guild, check_minutes: int,
                                 notification_time_before: int, yt_channel_url: str,
                                 notification_channel: discord.TextChannel):
@@ -271,6 +319,85 @@ def discord_bot():
         await embed_output_server_message(ctx, embed_=emb)
 
         # LOOPS
+    # ADD 10/04/25
+        # region PARSER_YOUTUBE_MSG
+
+    async def ytube_last_msg(server, channel_for_notification: discord.TextChannel, yt_channel_indent: str):
+
+        ytube_msg = BOT_CONFIG[server.id]['features']['ytube_msg']
+        yt_settings_mgs = ytube_msg['settings']
+        server_ready = BOT_CONFIG[server.id]['ready']
+
+        if not any([yt_settings_mgs['enable']['value'], server_ready]):
+            logger.info("Bot or channel isn't ready for launching YT Message notificator.")
+            return
+
+        # TODO: Получить данные по сообщению;
+        ytube_msg['msg_id'] = db_requests.server_community_message_get(server.id)
+        yt_msg_post = YouTubeLastMessageTabParser(ytube_msg['msg_id'], yt_channel_indent)
+        yt_msg_post.check_new_community_post()
+        if yt_msg_post.status is YoutubeMessageStatus.NOTIFIED:
+            logger.info(f"Нет новых сообщений во вкладе сообщества")
+            return
+        elif yt_msg_post.status is YoutubeMessageStatus.NEW:
+            logger.info(f"1 новое сообщение во вкладке сообщества!")
+            ytube_msg['msg_id'] = yt_msg_post.msg_id
+
+            post_card_emb, post_card_view = yt_msg_post.get_discord_msg_card()
+            await channel_for_notification.send(content="@everyone", embed=post_card_emb, view=post_card_view)
+            
+            db_requests.server_community_message_update(server.id, yt_msg_post.msg_id)
+            
+        logger.info(f"Обработано новое сообщение в сообществе {yt_msg_post.msg_id}")
+
+    @commands_group_ytube.command(name="start_msg", description="Enable YouTube Message Notificator.", extras=DEFER_YES)
+    @app_commands.describe(channel_url="YouTube Identificator",
+                           notification_channel="Discord channel for sending notifications.",
+                           check_minutes="Check new stream every X minutes. Default = 15 | Min = 10")
+    @discord_async_try_except_decorator
+    async def ytube_service_start(ctx: discord.Interaction,
+                                  notification_channel: discord.TextChannel,
+                                  channel_url: str,
+                                  check_minutes: app_commands.Range[int, 10] = 15):
+        server = ctx.guild
+        if not await passed_checks_before_start_command(
+                server, ctx, notification_channel, checks=[StartChecks.OWNER, StartChecks.REGISTRATION,
+                                                           StartChecks.CHANNEL_EXIST,
+                                                           StartChecks.CHANNEL_AVAILABLE]): return
+        task_status, task_message = await task_ytube_msg_create(server,
+                                                                check_minutes,
+                                                                channel_url,
+                                                                notification_channel)
+        await embed_output_server_message(ctx, task_message, True)
+
+    @commands_group_ytube.command(name="stop_msg", description="Disable YouTube Message Notificator.", extras=DEFER_YES)
+    @discord_async_try_except_decorator
+    async def ytube_service_stop(ctx: discord.Interaction):
+        server = ctx.guild
+        if not await passed_checks_before_start_command(
+                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]): return
+        task_status, task_message = await task_ytube_msg_stop(server)
+        await embed_output_server_message(ctx, task_message)
+
+    @commands_group_ytube.command(name="restart_msg", description="Restart YouTube Message Notificator.", extras=DEFER_YES)
+    @discord_async_try_except_decorator
+    async def ytube_service_restart(ctx: discord.Interaction):
+        server = ctx.guild
+        if not await passed_checks_before_start_command(
+                server, ctx, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
+            return
+        task_message = 'YouTube is not ready'
+        r = await check_bot_before_starting_tasks(server)
+        if r['response']:
+            # await task_ytube_restart(server, bot_channel)
+            task_status, task_message = await task_ytube_msg_restart(server)
+
+        await embed_output_server_message(ctx, f"Restart: {task_message}")
+
+    # endregion
+
+    # ADD 10/04/25
+
         # region PARSER_YOUTUBE
 
     def update_match_ytube_list(server: discord.Guild):
@@ -824,6 +951,11 @@ def discord_bot():
             if ytube_task is not None:
                 next_iteration = datetime.strftime(ytube_task.next_iteration, '%d.%m.%y %H:%M') if ytube_task.next_iteration is not None else "None"
                 ytube_info = f"Task has been found: Next launch (GMT): {next_iteration}"
+            # ADD 10/04/25
+            if ytube_msg_task is not None:
+                next_iteration = datetime.strftime(ytube_msg_task.next_iteration, '%d.%m.%y %H:%M') if ytube_msg_task.next_iteration is not None else "None"
+                ytube_msg_info = f"Task has been found: Next launch (GMT): {next_iteration}"
+            # ADD 10/04/25
         emb = discord.Embed(title="SERVER-INFO", )
         emb.add_field(name="Name", value=f"[**{ctx.guild.name}**]")
         emb.add_field(name="ID", value=f"[**{ctx.guild.id}**]")
@@ -831,6 +963,9 @@ def discord_bot():
         emb.add_field(name="Service channel", value=f"[**{bot_channel_name}**]")
         emb.add_field(name="EGS-notificator", value=f"[**{egs_info}**]", inline=False)
         emb.add_field(name="YouTube-notificator", value=f"[**{ytube_info}**]", inline=False)
+        # ADD 10/04/25
+        emb.add_field(name="YouTube_Message-notificator", value=f"[**{ytube_msg_info}**]", inline=False)
+        # ADD 10/04/25
         emb.set_thumbnail(url=bot.user.avatar)
         await ctx.edit_original_response(embed=emb)
 
@@ -994,6 +1129,37 @@ def discord_bot():
             if bot_channel is None:
                 return False, logger_save_and_return_text('Service YouTube is not ready')
 
+    # ADD 11/04/2025
+
+    async def task_ytube_msg_restart(server: discord.Guild, bot_channel: discord.TextChannel = None):
+        ytube_msg_service = BOT_CONFIG[server.id]["features"]["ytube_msg"]
+        ytube_msg_settings = ytube_msg_service["settings"]
+        if ytube_msg_settings['enable']['value']:
+            ytube_msg_service['task'] = None
+            ytube_channel = bot.get_channel(int(ytube_msg_settings['channel_id']['value']))
+
+            if ytube_channel is None:
+                text = 'You don\'n have a channel for fetching data from Youtube.'
+                if bot_channel is None:  # Launched by slash command
+                    return False, logger_save_and_return_text(text)
+                else:  # Launched by task manager
+                    await bot_channel.send(text)
+                    return
+            
+            task_status, task_message = await task_ytube_msg_create(
+                server=server, check_minutes=int(ytube_msg_settings['repeat']['value']),
+                notification_channel=ytube_channel,
+                yt_channel_url=ytube_msg_settings['yt_channel']['value'])
+            if bot_channel is None:
+                return task_status, task_message
+            else:
+                await bot_channel.send(content=task_message)
+        else:
+            if bot_channel is None:
+                return False, logger_save_and_return_text('Service YouTube is not ready')
+
+    # ADD 11/04/2025 
+
     async def check_bot_before_starting_tasks(server: discord.Guild):
         server_ready = BOT_CONFIG[server.id]['ready']
         bot_channel = bot.get_channel(BOT_CONFIG[server.id]['bot_channel'])
@@ -1013,6 +1179,7 @@ def discord_bot():
             bot_channel = r['bot_channel']
             await task_ytube_restart(server, bot_channel)
             await task_egs_restart(server, bot_channel)
+            await task_ytube_msg_restart(server, bot_channel)
 
     # region BOT_LOOP_TASKS
     @tasks.loop(hours=1)
@@ -1055,6 +1222,8 @@ def discord_bot():
                     task_status, task_message = await task_egsgames_stop(server)
                 if deleted_channel.id == BOT_CONFIG[server.id]['features']['ytube']['settings']['channel_id']['value']:
                     task_status, task_message = await task_ytube_stop(server)
+                if deleted_channel.id == BOT_CONFIG[server.id]['features']['ytube_msg']['settings']['channel_id']['value']:
+                    task_status, task_message = await task_ytube_msg_stop(server)
                 if task_message is not None and BOT_CONFIG[server.id]['ready']:
                     await bot_channel.send(content=task_message)
 
@@ -1082,6 +1251,7 @@ def discord_bot():
         if server.id in BOT_CONFIG:
             await task_ytube_stop(server)
             await task_egsgames_stop(server)
+            await task_ytube_msg_stop(server)
             db_requests.server_delete_bot_registration(server.id)
             del BOT_CONFIG[server.id]
 
@@ -1109,7 +1279,7 @@ def discord_bot():
         if server.id in BOT_CONFIG:
             logger.info(f'Settings have been loaded already for [{server.name}, {server.id}]')
             return
-        bot_channel, bot_ready = db_requests.server_get_bot_settings(server.id)
+        bot_channel, bot_ready, ytube_msg_id = db_requests.server_get_bot_settings(server.id)
         BOT_CONFIG[server.id] = {
             'id': server.id,
             'name': server.name,
@@ -1121,6 +1291,7 @@ def discord_bot():
             'match_egs': db_requests.server_get_matching_egs_list(server.id),
             'spin_wheel': db_requests.server_get_spinwheel_list(server.id),
         }
+        BOT_CONFIG[server.id]['features']['ytube_msg']['msg_id'] = ytube_msg_id
 
     bot.run(token=config.BUNNYBYTE_TOKEN)
 

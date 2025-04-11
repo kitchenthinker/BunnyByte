@@ -36,12 +36,26 @@ def server_get_bot_settings(server_id: int | str = None):
     # LOCAL_SETTING = BOT_LOCAL_CONFIG.get('bot_channels')
     # if LOCAL_SETTING is not None:
     #     return server_id if server_id in LOCAL_SETTING else None
-    MYSQL = mysql_getdata(f"SELECT service_channel, ready FROM `bot_config` WHERE `server_id`=%s", values=server_id)
+    MYSQL = mysql_getdata(f"SELECT service_channel, ready, msg_id FROM `bot_config` WHERE `server_id`=%s", values=server_id)
     if MYSQL.empty:
         return None, False
     else:
-        return int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready'])
+        return int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready'], MYSQL.data[0]['msg_id'])
 
+###
+# UPDATE 10/04/2025
+@simple_try_except_decorator
+def server_community_message_update(server: Guild, value):
+    MYSQL = mysql.MYSQL()
+    MYSQL.execute("UPDATE `bot_config` SET `msg_id` = %s WHERE `server_id` = %s", values=(value, server.id))
+    MYSQL.commit(True)
+
+@simple_try_except_decorator
+def server_community_message_get(server_id):
+    MYSQL = mysql.MYSQL()
+    MYSQL.get_data(user_query="SELECT `msg_id` FROM bot_config WHERE `server_id` = %s", values=server_id)
+    return MYSQL.data[0]['msg_id']
+###
 
 @simple_try_except_decorator
 def server_update_bot_ready(server: Guild, value):
@@ -83,14 +97,16 @@ def server_get_settings(server_id: int | str = None):
                    "WHERE srv_config.server_id = %s",
         values=server_id
     )
-    settings_egs, settings_ytube = None, None
+    settings_egs, settings_ytube, settings_ytube_msg = None, None, None
     if not MYSQL.empty:
         settings_egs = return_setting_dict('egs')
         settings_ytube = return_setting_dict('ytube')
+        settings_ytube_msg = return_setting_dict('ytube_msg')
     MYSQL.close()
     return {
         'egs': {'settings': settings_egs, 'task': None, },
-        'ytube': {'settings': settings_ytube, 'task': None, }
+        'ytube': {'settings': settings_ytube, 'task': None, },
+        'ytube_msg': {'settings': settings_ytube_msg, 'task': None, 'msg_id': '', }
     }
 
 
