@@ -40,7 +40,7 @@ def server_get_bot_settings(server_id: int | str = None):
     if MYSQL.empty:
         return None, False
     else:
-        return int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready'], MYSQL.data[0]['msg_id'])
+        return int(MYSQL.data[0]['service_channel']), bool(MYSQL.data[0]['ready']), MYSQL.data[0]['msg_id']
 
 ###
 # UPDATE 10/04/2025
