@@ -86,6 +86,7 @@ class YouTubeLastMessageTabParser:
                                     self.msg_text = text
                                     self.msg_id = post_id
                                     self.status = YoutubeMessageStatus.NEW
+                                    return
                 break
         print("Записи сообщества не найдены.")
 
