@@ -67,7 +67,7 @@ class YouTubeLastMessageTabParser:
                 sections = self._safe_get(tab, ["tabRenderer", "content", "sectionListRenderer", "contents"], [])
                 for section in sections:
                     items = self._safe_get(section, ["itemSectionRenderer", "contents"], [])
-                    for item in items:
+                    for item in items[:1]:
                         post_thread = self._safe_get(item, ["backstagePostThreadRenderer"])
                         if post_thread:
                             post = self._safe_get(post_thread, ["post", "backstagePostRenderer"])
@@ -78,6 +78,8 @@ class YouTubeLastMessageTabParser:
                                 content_runs = self._safe_get(post, ["contentText", "runs"], [])
                                 text = "".join([run.get("text", "") for run in content_runs])
 
+                                print(f"{post_id}, {self.msg_id}, {self.status}")
+
                                 if post_id == self.msg_id:
                                     print("Новых записей нет.")
                                 else:
@@ -86,8 +88,6 @@ class YouTubeLastMessageTabParser:
                                     self.msg_text = text
                                     self.msg_id = post_id
                                     self.status = YoutubeMessageStatus.NEW
-                                    return
-                break
         print("Записи сообщества не найдены.")
 
 
