@@ -346,7 +346,7 @@ def discord_bot():
             ytube_msg['msg_id'] = yt_msg_post.msg_id
 
             post_card_emb, post_card_view = yt_msg_post.get_discord_msg_card()
-            await channel_for_notification.send(content="@silent @everyone", embed=post_card_emb, view=post_card_view)
+            await channel_for_notification.send(content="@everyone", silent=True, embed=post_card_emb, view=post_card_view)
             
             db_requests.server_community_message_update(server, yt_msg_post.msg_id)
             
