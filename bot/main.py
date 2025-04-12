@@ -334,8 +334,10 @@ def discord_bot():
 
         # TODO: Получить данные по сообщению;
         ytube_msg['msg_id'] = db_requests.server_community_message_get(server.id)
+        logger.info(f"Получены данные {ytube_msg['msg_id'}")
         yt_msg_post = YouTubeLastMessageTabParser(ytube_msg['msg_id'], yt_channel_indent)
         await yt_msg_post.check_new_community_post()
+        logger.info(f"Получены данные:\n{yt_msg_post}")
         if yt_msg_post.status is YoutubeMessageStatus.NOTIFIED:
             logger.info(f"Нет новых сообщений во вкладе сообщества")
             return
