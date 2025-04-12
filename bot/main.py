@@ -945,6 +945,7 @@ def discord_bot():
         if local_get_status(server.id) is ServerStatus.REGISTERED:
             egs_task = BOT_CONFIG[server.id]['features']['egs']['task']
             ytube_task = BOT_CONFIG[server.id]['features']['ytube']['task']
+            ytube_msg_task = BOT_CONFIG[server.id]['features']['ytube_msg']['task']
             if egs_task is not None:
                 next_iteration = datetime.strftime(egs_task.next_iteration, '%d.%m.%y %H:%M') if egs_task.next_iteration is not None else "None"
                 egs_info = f"Task has been found: Next launch (GMT): {next_iteration}"
