@@ -669,9 +669,9 @@ def discord_bot():
     async def spinwheel_add(interaction: discord.Interaction,
                             game: str,
                             status: SpinWheelGameStatus,
-                            playlist: str = None, 
+                            playlist: str = None,
                             comment: str = None,
-                            hltb: app_commands.Range[int, 1, 999]):
+                            hltb: app_commands.Range[int, 1, 999] = None):
         server = interaction.guild
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
@@ -696,7 +696,7 @@ def discord_bot():
     async def spinwheel_edit(interaction: discord.Interaction, game: str, name: str = None,
                              status: SpinWheelGameStatusEdit = SpinWheelGameStatusEdit.Previous,
                              playlist: str = None, comment: str = None,
-                             hltb: app_commands.Range[int, 1, 999]):
+                             hltb: app_commands.Range[int, 1, 999] = None):
         server = interaction.guild
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
