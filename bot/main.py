@@ -649,11 +649,11 @@ def discord_bot():
 
         if action is SpinWheelAction.Add:
             BOT_CONFIG[server.id]['spin_wheel'][values_row['game']] = {
-                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment'], values_row['hltb']}
+                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment'], "hltb": values_row['hltb']}
         elif action is SpinWheelAction.Edit:
             del BOT_CONFIG[server.id]['spin_wheel'][values_row['game']]
             BOT_CONFIG[server.id]['spin_wheel'][values_row['new_game']] = {
-                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment'], values_row['hltb']}
+                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment'], "hltb": values_row['hltb']}
         elif action is SpinWheelAction.Delete:
             del BOT_CONFIG[server.id]['spin_wheel'][values_row['game']]
         BOT_CONFIG[server.id]['spin_wheel'] = dict(sorted(BOT_CONFIG[server.id]['spin_wheel'].items()))
