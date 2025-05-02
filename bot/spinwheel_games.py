@@ -111,9 +111,11 @@ class Paginator:
             value_ = "\u200b"
             if self.info['show_pl']:
                 value_ = f"📺 [Посмотреть]({game['url']})" if game['url'] is not None else "📺 Пока пусто"
+                value_ += "\n"
             if self.is_admin:
-                value_ += f"\n💬:{game['comment']}"
-                value_ += f"\n⏳: {game['hltb']} ч."
+                value_ += f"💬:{game['comment']}\n"
+                value_ += f"⏳: {game['hltb']} ч.\n"
+                value_ += "-----\n"
             emb_group.add_field(name=f"🕹️ {game['game']}", value=f"{value_}\n\n", inline=bool(self.table_view))
 
         pages_count = (len(self.game_list) // Paginator.slice_number)
