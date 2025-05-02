@@ -149,12 +149,13 @@ def server_get_matching_egs_list(server_id: int | str = None):
 @simple_try_except_decorator
 def server_get_spinwheel_list(server_id: int | str = None):
     MYSQL = mysql_getdata(
-        user_query="SELECT game, status, url, comment FROM spin_wheel WHERE server_id = %s ORDER BY `status`, game",
+        user_query="SELECT game, status, url, comment, hltb FROM spin_wheel WHERE server_id = %s ORDER BY `status`, game",
         values=server_id
     )
     return dict() if MYSQL.empty else {x['game']: {"status": SpinWheelGameStatus(x['status']),
                                                    "url": x['url'],
-                                                   "comment": x['comment']} for x in MYSQL.data}
+                                                   "comment": x['comment'],
+                                                   "hltb": x['hltb']} for x in MYSQL.data}
 
 
 @simple_try_except_decorator
@@ -296,19 +297,19 @@ def spinwheel_save_to_server(server: Guild, values_row: dict, action: SpinWheelA
     if action is SpinWheelAction.Add:
         MYSQL.execute(
             user_query="INSERT INTO spin_wheel "
-                       "(`game`, `status`, `url`, `comment`, `server_id`) "
-                       "VALUES (%s,%s,%s,%s,%s)",
+                       "(`game`, `status`, `url`, `comment`, `hltb`, `server_id`) "
+                       "VALUES (%s,%s,%s,%s,%s,%s)",
             values=(
-                values_row['game'], values_row['status'].value, values_row['url'], values_row['comment'],
+                values_row['game'], values_row['status'].value, values_row['url'], values_row['comment'], values_row['hltb'],
                 server.id)
         )
     elif action is SpinWheelAction.Edit:
         MYSQL.execute(
             user_query="UPDATE spin_wheel "
-                       "SET `status` = %s, `url` = %s, `comment` = %s, `game` = %s"
+                       "SET `status` = %s, `url` = %s, `comment` = %s, `game` = %s, `hltb` = %s"
                        "WHERE `game` = %s and `server_id` = %s",
             values=(
-                values_row['status'].value, values_row['url'], values_row['comment'], values_row['new_game'],
+                values_row['status'].value, values_row['url'], values_row['comment'], values_row['new_game'], values_row['hltb'],
                 values_row['game'], server.id)
         )
     elif action is SpinWheelAction.Delete:

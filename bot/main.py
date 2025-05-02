@@ -649,11 +649,11 @@ def discord_bot():
 
         if action is SpinWheelAction.Add:
             BOT_CONFIG[server.id]['spin_wheel'][values_row['game']] = {
-                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment']}
+                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment'], values_row['hltb']}
         elif action is SpinWheelAction.Edit:
             del BOT_CONFIG[server.id]['spin_wheel'][values_row['game']]
             BOT_CONFIG[server.id]['spin_wheel'][values_row['new_game']] = {
-                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment']}
+                "status": values_row['status'], "url": values_row['url'], "comment": values_row['comment'], values_row['hltb']}
         elif action is SpinWheelAction.Delete:
             del BOT_CONFIG[server.id]['spin_wheel'][values_row['game']]
         BOT_CONFIG[server.id]['spin_wheel'] = dict(sorted(BOT_CONFIG[server.id]['spin_wheel'].items()))
@@ -663,12 +663,15 @@ def discord_bot():
     @app_commands.describe(game="Game to add into your Spin Wheel List.",
                            status="Game status [In List, In Progress, In Finished List, In Waiting List, In Ban List].",
                            playlist="Save YT-playlist Link.",
-                           comment="Comment to current record.")
+                           comment="Comment to current record.",
+                           hltb="Time to beat.")
     @discord_async_try_except_decorator
     async def spinwheel_add(interaction: discord.Interaction,
                             game: str,
                             status: SpinWheelGameStatus,
-                            playlist: str = None, comment: str = None):
+                            playlist: str = None, 
+                            comment: str = None,
+                            hltb: app_commands.Range[int, 1, 999]):
         server = interaction.guild
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
@@ -678,7 +681,7 @@ def discord_bot():
         if game_ is not None:
             await embed_output_server_message(interaction, f'This game is already in db **{game}**')
             return
-        await spinwheel_save_to_db(server, {"game": game, "status": status, "url": playlist, "comment": comment},
+        await spinwheel_save_to_db(server, {"game": game, "status": status, "url": playlist, "comment": comment, "hltb": hltb},
                                    SpinWheelAction.Add)
         await embed_output_server_message(interaction, f'Your game has been added **{game}**', True)
 
@@ -687,11 +690,13 @@ def discord_bot():
     @app_commands.choices(status=game_status_choices)
     @app_commands.describe(game="Game from your Spin Wheel List.", name="Change name of game",
                            status="Game status | Default = Previous Status", playlist="Save YT-playlist Link.",
-                           comment="Comment to current record. Type ! to wipe out.")
+                           comment="Comment to current record. Type ! to wipe out.",
+                           hltb="Time to beat. Увы, но надо вносить время вновь.")
     @discord_async_try_except_decorator
     async def spinwheel_edit(interaction: discord.Interaction, game: str, name: str = None,
                              status: SpinWheelGameStatusEdit = SpinWheelGameStatusEdit.Previous,
-                             playlist: str = None, comment: str = None):
+                             playlist: str = None, comment: str = None,
+                             hltb: app_commands.Range[int, 1, 999]):
         server = interaction.guild
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
@@ -708,7 +713,7 @@ def discord_bot():
         name = game if name is None else name
 
         await spinwheel_save_to_db(server, {"game": game, "new_game": name, "status": status, "url": playlist,
-                                            "comment": comment}, SpinWheelAction.Edit)
+                                            "comment": comment, "hltb": hltb}, SpinWheelAction.Edit)
         await embed_output_server_message(interaction, msg=f'Your game has been changed **{game}**')
 
     @commands_group_spinwheel.command(name="delete", description="Delete a game from Spin Wheel.", extras=DEFER_YES)
@@ -725,7 +730,7 @@ def discord_bot():
         if game_ is None:
             await embed_output_server_message(interaction, msg=f'I don\'t have this game in db {game}')
             return
-        await spinwheel_save_to_db(server, {"game": game, "status": None, "url": None}, SpinWheelAction.Delete)
+        await spinwheel_save_to_db(server, {"game": game, "status": None, "url": None, "hltb": 0}, SpinWheelAction.Delete)
         await embed_output_server_message(interaction, msg=f'Your has been deleted **{game}**')
 
     @commands_group_spinwheel.command(name="choice", description="Choice a game for playing.")
@@ -735,8 +740,9 @@ def discord_bot():
         if not await passed_checks_before_start_command(
                 server, interaction, checks=[StartChecks.OWNER, StartChecks.REGISTRATION]):
             return
-
-        game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
+        await embed_output_server_message(interaction, f'The command is not allowed.')
+        return
+        game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment'], "hltb": item['hltb']}
                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
                      if item['status'] is SpinWheelGameStatus.InList]
         if not game_list:
@@ -755,12 +761,16 @@ def discord_bot():
         await interaction.edit_original_response(embed=emb)
 
     @commands_group_spinwheel.command(name="poll", description="Create a poll.", extras={'use_defer': False})
-    @app_commands.describe(count="How many games do you want to choose? Default = 3",
-                           streams="Is it a list 'Games for Stream'? Default = No",
-                           defer="Visible only for you. Default = Yes")
+    @app_commands.describe(count="Сколько игр хочешь выбрать? По умолчанию = 3",
+                           streams="Выбрать из списка для стримов? По умолчанию = No",
+                           min_time="Минимальное время для прохождения. По умолчанию = 1",
+                           max_time="Максимальное время для прохождения. По умолчанию = 999",
+                           defer="Показать сообщение только тебе? По умолчанию = Yes")
     @discord_async_try_except_decorator
     async def spinwheel_poll(interaction: discord.Interaction, count: app_commands.Range[int, 1, 5] = 3,
                              streams: SettingYesNo = SettingYesNo.No,
+                             min_time: app_commands.Range[int, 1, 999] = 1,
+                             max_time: app_commands.Range[int, 1, 999] = 999,
                              defer: SettingYesNo = SettingYesNo.Yes):
         server = interaction.guild
         await interaction.response.defer(ephemeral=defer.value)
@@ -771,7 +781,7 @@ def discord_bot():
         GameListFilter = SpinWheelGameStatus.InList if streams is SettingYesNo.No else SpinWheelGameStatus.InListStream
         game_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']}
                      for game, item in BOT_CONFIG[server.id]['spin_wheel'].items()
-                     if item['status'] is GameListFilter]
+                     if item['status'] is GameListFilter and item['hltb'] >= min_time and item['hltb'] <= max_time]
         if not game_list:
             await embed_output_server_message(interaction, f'The Game List is empty.')
             return
@@ -880,7 +890,7 @@ def discord_bot():
             filter_category = [int(char) for char in filter_category]
         filter_category.sort()
 
-        games_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment']} for
+        games_list = [{"game": game, "status": item['status'], "url": item['url'], "comment": item['comment'], "hltb": item['hltb']} for
                       game, item in BOT_CONFIG[server.id]['spin_wheel'].items() if
                       item['status'].value in filter_category and (
                           True if search is None else game.lower().find(search.lower()) != -1)]
@@ -967,7 +977,7 @@ def discord_bot():
         emb.add_field(name="EGS-notificator", value=f"[**{egs_info}**]", inline=False)
         emb.add_field(name="YouTube-notificator", value=f"[**{ytube_info}**]", inline=False)
         # ADD 10/04/25
-        emb.add_field(name="YouTube_Message-notificator", value=f"[**{ytube_msg_info}**]", inline=False)
+        emb.add_field(name="YouTube_MSG-notificator", value=f"[**{ytube_msg_info}**]", inline=False)
         # ADD 10/04/25
         emb.set_thumbnail(url=bot.user.avatar)
         await ctx.edit_original_response(embed=emb)
@@ -1184,7 +1194,17 @@ def discord_bot():
             await task_egs_restart(server, bot_channel)
             await task_ytube_msg_restart(server, bot_channel)
 
-    # region BOT_LOOP_TASKS
+    # # region BOT_LOOP_TASKS
+    # @tasks.loop(hours=1)
+    # async def bot_restart_failed_tasks():
+    #     for server in BOT_CONFIG['servers'].keys():
+    #         r = await check_bot_before_starting_tasks(server)
+    #         if r['response']:
+    #             bot_channel = r['bot_channel']
+    #             await task_ytube_restart(server, bot_channel)
+    #             await task_egs_restart(server, bot_channel)
+    #             await task_ytube_msg_restart(server, bot_channel)
+
     @tasks.loop(hours=1)
     async def bot_task_get_free_games_list():
         logger.info(f"Starting task 'Get Free Games'")
