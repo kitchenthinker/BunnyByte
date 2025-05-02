@@ -306,7 +306,7 @@ def spinwheel_save_to_server(server: Guild, values_row: dict, action: SpinWheelA
     elif action is SpinWheelAction.Edit:
         MYSQL.execute(
             user_query="UPDATE spin_wheel "
-                       "SET `status` = %s, `url` = %s, `comment` = %s, `game` = %s, `hltb` = %s"
+                       "SET `status` = %s, `url` = %s, `comment` = %s, `game` = %s, `hltb` = %s "
                        "WHERE `game` = %s and `server_id` = %s",
             values=(
                 values_row['status'].value, values_row['url'], values_row['comment'], values_row['new_game'], values_row['hltb'],
