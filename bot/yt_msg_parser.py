@@ -63,7 +63,7 @@ class YouTubeLastMessageTabParser:
         tabs = self._safe_get(data, ["contents", "twoColumnBrowseResultsRenderer", "tabs"], [])
         for tab in tabs:
             community_tab_url = self._safe_get(tab, ["tabRenderer", "endpoint", "commandMetadata", "webCommandMetadata", "url"])
-            if community_tab_url and community_tab_url.endswith(f"/@{self.channel_identifier}/community"):
+            if community_tab_url and community_tab_url.endswith(f"/@{self.channel_identifier}/posts"):
                 sections = self._safe_get(tab, ["tabRenderer", "content", "sectionListRenderer", "contents"], [])
                 for section in sections:
                     items = self._safe_get(section, ["itemSectionRenderer", "contents"], [])
@@ -93,7 +93,7 @@ class YouTubeLastMessageTabParser:
 
     async def check_new_community_post(self):
         """Проверяет наличие новых записей в сообществе YouTube-канала путем асинхронного скрапинга."""
-        community_url = f"https://www.youtube.com/@{self.channel_identifier}/community" # Предполагаем, что используется псевдоним
+        community_url = f"https://www.youtube.com/@{self.channel_identifier}/posts" # Предполагаем, что используется псевдоним
 
         try:
             async with aiohttp.ClientSession() as session:
