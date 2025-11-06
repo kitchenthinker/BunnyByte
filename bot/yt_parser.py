@@ -96,6 +96,14 @@ class YTLiveStreamParser:
     async def get_last_livestream(self) -> YouTubeLiveStream:
         current_livestream = self.current_livestream
         livestream_data = await self.get_html_page_info()
+        
+        lsd_StartTimeText = livestream_data.find(string=re.compile("scheduledStartTime"))
+        stream_time_match = re.search(r'"scheduledStartTime":"(\d+)"', lsd_StartTimeText if lsd_StartTimeText else "")
+        if stream_time_match:
+            stream_time = stream_time_match.group(1)
+        else:
+            stream_time = '4070912461'
+            
         #print(f"{livestream_data[:100]}")
         if livestream_data is not None:
             live = livestream_data.find("link", {"rel": "canonical"})
@@ -112,7 +120,8 @@ class YTLiveStreamParser:
                     if temp_livestream.upcoming:
                         print('upcoming_livestream')
                         re_result = re.findall(r'scheduledStartTime.+(\d{10}).+mainText', temp_livestream.embed_html)
-                        timestamp = re_result[0]
+                        timestamp = stream_time
+                        #re_result[0]
 
                         #timestamp = temp_livestream.vid_info['playabilityStatus']['liveStreamability']['liveStreamabilityRenderer']['offlineSlate']['liveStreamOfflineSlateRenderer']['scheduledStartTime']
                         temp_livestream.upcoming_date = datetime(1970, 1, 1, 0, 0, 0) + timedelta(
