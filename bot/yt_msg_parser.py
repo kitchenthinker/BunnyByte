@@ -24,6 +24,7 @@ class YouTubeLastMessageTabParser:
         self.msg_text = ''
         self.msg_author = ''
         self.msg_url = ''
+        self.msg_img = ''
         self.channel_identifier = channel_ident
         self.status = YoutubeMessageStatus.NOTIFIED
 
@@ -35,6 +36,9 @@ class YouTubeLastMessageTabParser:
                            colour=Colour.purple())
         embed_card.set_author(name=self.msg_author)
         embed_card.set_thumbnail(url=NOTIFICATION_IMAGE)
+        
+        if self.msg_img != '':
+            embed_card.set_image(url=self.msg_img)
         
         url_button = Button(label="🐰 Перейти 🥕", 
                             style=ButtonStyle.red, 
@@ -78,6 +82,9 @@ class YouTubeLastMessageTabParser:
                                 content_runs = self._safe_get(post, ["contentText", "runs"], [])
                                 text = "".join([run.get("text", "") for run in content_runs])
 
+                                post_images = self._safe_get(post, ["backstageAttachment", "backstageImageRenderer", "image", "thumbnails"], [])
+                                post_img_url = post_images[0].get("url") if post_images else ""
+
                                 print(f"{post_id}, {self.msg_id}, {self.status}")
 
                                 if post_id == self.msg_id:
@@ -87,6 +94,7 @@ class YouTubeLastMessageTabParser:
                                     self.msg_author = author_text
                                     self.msg_text = text
                                     self.msg_id = post_id
+                                    self.msg_img = post_img_url
                                     self.status = YoutubeMessageStatus.NEW
         print("Записи сообщества не найдены.")
 
